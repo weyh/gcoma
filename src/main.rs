@@ -28,8 +28,6 @@ fn parse_args(args: &mut Vec<String>, data_path: &mut String) -> bool {
 
 fn main() {
     let mut args: Vec<String> = env::args().collect();
-    let asd: String = "".to_string();
-    args.push(asd);
 
     let mut data_path = String::new();
     if parse_args(&mut args, &mut data_path) {
