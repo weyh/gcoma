@@ -31,7 +31,7 @@ fn main() {
 
     let mut data_path = String::new();
     if parse_args(&mut args, &mut data_path) {
-        let mut ui = ui::UI::new(&data_path);
+        let mut ui = ui::core_ui::UI::new(&data_path);
         ui.main_menu();
     }
 }
