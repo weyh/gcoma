@@ -2,7 +2,7 @@
 name = "gcoma"
 description = "Geri's Connection Manager"
 repository = "https://github.com/weyh/gcoma"
-version = "0.9.0"
+version = "0.9.1"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"

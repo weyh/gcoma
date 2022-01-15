@@ -33,8 +33,10 @@ impl Session {
     pub fn get_port(&self) -> String {
         let start = self.data.find(":").unwrap_or(0);
 
-        if start == 0 {
+        if start == 0 && self.connection_type == ConnectionType::SSH {
             return "22".to_string();
+        } else if start == 0 && self.connection_type == ConnectionType::Telnet {
+            return "23".to_string();
         }
 
         let end = self.data.find("/").unwrap_or(self.data.len());
