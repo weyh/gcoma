@@ -10,7 +10,7 @@ If you find anything that isn't rusty enough feel free to correct me. :)
 ```
 Usage: gcoma [conf_file_path]
 
-Eg.: ./gcoma ~/.gcoma-conf.json
+Eg.: ./gcoma -c ~/.gcoma-conf.json
 ```
 
 ## Screenshot
