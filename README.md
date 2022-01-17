@@ -8,9 +8,13 @@ If you find anything that isn't rusty enough feel free to correct me. :)
 
 ## Args
 ```
-Usage: gcoma [conf_file_path]
+USAGE:
+    gcoma --config-file-path <CONFIG_FILE_PATH>
 
-Eg.: ./gcoma -c ~/.gcoma-conf.json
+OPTIONS:
+    -c, --config-file-path <CONFIG_FILE_PATH>
+    -h, --help                                   Print help information
+    -V, --version                                Print version information
 ```
 
 ## Screenshot
