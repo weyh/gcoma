@@ -10,6 +10,12 @@ pub struct Color {
     b: u8,
 }
 
+macro_rules! color_to_acolour {
+    ($color:expr) => {
+        RGB($color.r as u8, $color.g as u8, $color.b as u8)
+    };
+}
+
 const DEFAULT_PRINARY_COLOR: Color = Color {
     r: 248,
     g: 248,
@@ -44,31 +50,19 @@ pub struct UIColors {
 
 impl UIColors {
     pub fn primary(&self) -> ansi_term::Colour {
-        RGB(
-            self.primary_color.r,
-            self.primary_color.g,
-            self.primary_color.b,
-        )
+        color_to_acolour!(&self.primary_color)
     }
 
     pub fn success(&self) -> ansi_term::Colour {
-        RGB(
-            self.success_color.r,
-            self.success_color.g,
-            self.success_color.b,
-        )
+        color_to_acolour!(&self.success_color)
     }
 
     pub fn error(&self) -> ansi_term::Colour {
-        RGB(self.error_color.r, self.error_color.g, self.error_color.b)
+        color_to_acolour!(&self.error_color)
     }
 
     pub fn highlight(&self) -> ansi_term::Colour {
-        RGB(
-            self.highlight_color.r,
-            self.highlight_color.g,
-            self.highlight_color.b,
-        )
+        color_to_acolour!(&self.highlight_color)
     }
 }
 

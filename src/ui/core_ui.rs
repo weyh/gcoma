@@ -10,6 +10,13 @@ use crate::session_core::session_group::SessionGroup;
 use crate::ui::config::Config;
 use crate::ui::config::UIColors;
 
+macro_rules! print_flush {
+    ($($arg:tt)*) => {
+        print!($($arg)*);
+        std::io::stdout().flush().unwrap();
+    };
+}
+
 macro_rules! clear_screen {
     () => {
         print_flush!("\x1B[2J");
@@ -19,13 +26,6 @@ macro_rules! clear_screen {
 macro_rules! set_cursor_position {
     ($x:expr, $y:expr) => {
         print_flush!("\x1B[{};{}H", $y, $x);
-    };
-}
-
-macro_rules! print_flush {
-    ($($arg:tt)*) => {
-        print!($($arg)*);
-        std::io::stdout().flush().unwrap();
     };
 }
 

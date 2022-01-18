@@ -3,6 +3,7 @@ use clap::Parser;
 #[cfg(test)]
 mod tests;
 
+mod reqs_check;
 mod session_core;
 mod ui;
 
@@ -14,6 +15,15 @@ struct Args {
 }
 
 fn main() {
+    if !reqs_check::is_in_env("ssh") {
+        println!("'ssh' is not found in PATH!");
+        return;
+    }
+    if !reqs_check::is_in_env("telnet") {
+        println!("'telnet' is not found in PATH!");
+        return;
+    }
+
     let args = Args::parse();
 
     if args.config_file_path != "" {
