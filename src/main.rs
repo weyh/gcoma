@@ -16,11 +16,11 @@ struct Args {
 
 fn main() {
     if !reqs_check::is_in_env("ssh") {
-        println!("'ssh' is not found in PATH!");
+        eprintln!("'ssh' is not found in PATH!");
         return;
     }
     if !reqs_check::is_in_env("telnet") {
-        println!("'telnet' is not found in PATH!");
+        eprintln!("'telnet' is not found in PATH!");
         return;
     }
 
