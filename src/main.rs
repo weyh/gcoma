@@ -11,7 +11,27 @@ mod ui;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     #[clap(short, long, required = true)]
-    config_file_path: String,
+    user_config: String,
+    #[clap(short, long, conflicts_with_all = &["connect", "remove"])]
+    list: bool,
+    #[clap(
+        short,
+        long,
+        value_name = "SESSION_INDEX",
+        default_value = "-1",
+        conflicts_with_all = &["list", "remove"],
+        help = "Connect to session by index"
+    )]
+    connect: i64,
+    #[clap(
+        short,
+        long,
+        value_name = "SESSION_INDEX",
+        default_value = "",
+        conflicts_with_all = &["list", "connect"],
+        help = "Remove session group by name"
+    )]
+    remove: String,
 }
 
 fn main() {
@@ -26,8 +46,17 @@ fn main() {
 
     let args = Args::parse();
 
-    if args.config_file_path != "" {
-        let mut ui = ui::core_ui::UI::new(&args.config_file_path);
-        ui.main_menu();
+    if args.user_config != "" {
+        let mut ui = ui::core_ui::UI::new(&args.user_config);
+
+        if args.list {
+            ui.print_sessions(1, true);
+        } else if args.connect >= 0 {
+            ui.connect_to_session(args.connect as usize);
+        } else if args.remove != "" {
+            ui.remove_session_group_by_name(&args.remove);
+        } else {
+            ui.main_menu();
+        }
     }
 }

@@ -10,32 +10,7 @@ use crate::session_core::session_group::SessionGroup;
 use crate::ui::config::Config;
 use crate::ui::config::UIColors;
 
-macro_rules! print_flush {
-    ($($arg:tt)*) => {
-        print!($($arg)*);
-        std::io::stdout().flush().unwrap();
-    };
-}
-
-macro_rules! clear_screen {
-    () => {
-        print_flush!("\x1B[2J");
-    };
-}
-
-macro_rules! set_cursor_position {
-    ($x:expr, $y:expr) => {
-        print_flush!("\x1B[{};{}H", $y, $x);
-    };
-}
-
-macro_rules! stdin_read_line {
-    ($x:expr) => {
-        $x.clear();
-        std::io::stdout().flush().unwrap();
-        std::io::stdin().read_line($x).unwrap();
-    };
-}
+use crate::ui::ui_macros::*;
 
 pub struct UI {
     pub path: String,
@@ -175,6 +150,65 @@ impl UI {
             .retain(|x| x.name != user_input.trim());
     }
 
+    pub fn print_sessions(&self, left_offset: usize, clear_screen: bool) -> Vec<&Session> {
+        let mut all_sessions = Vec::new();
+        let max_lenght = self
+            .config
+            .session_groups
+            .iter()
+            .map(|x| x.name.len())
+            .max()
+            .unwrap_or(0);
+
+        if clear_screen {
+            clear_screen!();
+        }
+
+        let mut h: usize = 0;
+        for sg in self.config.session_groups.iter() {
+            set_cursor_position!(left_offset, h + 1);
+            println!("{}", self.config.colors.success().paint(&sg.name));
+
+            for session in &sg.sessions {
+                set_cursor_position!(
+                    left_offset + sg.name.len() + (max_lenght - sg.name.len()) + 1,
+                    h + 1
+                );
+                println!(
+                    "{}",
+                    self.config
+                        .colors
+                        .primary()
+                        .paint(format!("{}: {}", h, session.name))
+                );
+                all_sessions.push(session);
+                h += 1;
+            }
+        }
+
+        return all_sessions;
+    }
+
+    pub fn remove_session_group_by_name(&mut self, name: &str) {
+        self.config.session_groups.retain(|x| x.name != name.trim());
+    }
+
+    pub fn connect_to_session(&mut self, index: usize) {
+        let mut h: usize = 0;
+        for sg in self.config.session_groups.iter() {
+            for session in &sg.sessions {
+                if h == index {
+                    session.connect();
+                    return;
+                }
+
+                h += 1;
+            }
+        }
+
+        println!("{}", self.config.colors.error().paint("Invalid index!"));
+    }
+
     pub fn main_menu(&mut self) {
         let menu_text = self
             .config
@@ -182,80 +216,37 @@ impl UI {
             .primary()
             .paint("q: Quit\na: Add\nr: Remove");
 
-        let mut max_lenght = 0;
-
         let mut user_input = String::new();
-        let mut rebuild = true;
-        let mut run = true;
 
-        while run {
+        loop {
             clear_screen!();
             set_cursor_position!(0, 0);
 
-            let mut all_sessions: Vec<&Session> = Vec::new();
-
-            if rebuild {
-                max_lenght = self
-                    .config
-                    .session_groups
-                    .iter()
-                    .map(|x| x.name.len())
-                    .max()
-                    .unwrap_or(0);
-
-                rebuild = false;
-            }
-
             println!("{}", menu_text);
+            let all_sessions = self.print_sessions(12, false);
 
-            let mut h: usize = 0;
-            for sg in self.config.session_groups.iter() {
-                set_cursor_position!(12, h + 1);
-                println!("{}", self.config.colors.success().paint(&sg.name));
-
-                for session in &sg.sessions {
-                    set_cursor_position!(
-                        12 + sg.name.len() + (max_lenght - sg.name.len()) + 1,
-                        h + 1
-                    );
-                    println!(
-                        "{}",
-                        self.config
-                            .colors
-                            .primary()
-                            .paint(format!("{}: {}", h, session.name))
-                    );
-                    all_sessions.push(session);
-                    h += 1;
-                }
-            }
-
-            set_cursor_position!(0, cmp::max(h, 3));
+            set_cursor_position!(0, cmp::max(all_sessions.len(), 3));
             print_flush!("\n\n{}", self.config.colors.highlight().paint("Select: "));
             stdin_read_line!(&mut user_input);
 
             match user_input.trim() {
                 "q" => {
-                    run = false;
+                    break;
                 }
                 "a" => {
                     self.add_menu();
-                    rebuild = true;
-
                     self.save();
                 }
                 "r" => {
                     self.remove_menu();
-                    rebuild = true;
-
                     self.save();
                 }
                 _ => {
                     if user_input.trim().parse::<usize>().is_ok() {
                         let index = user_input.trim().parse::<usize>().unwrap();
-                        if index < h {
+                        if index < all_sessions.len() {
                             all_sessions[index].connect();
-                            thread::sleep(time::Duration::from_millis(500));
+                            thread::sleep(time::Duration::from_millis(1000));
                         }
                     }
                 }

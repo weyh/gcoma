@@ -9,12 +9,15 @@ If you find anything that isn't rusty enough feel free to correct me. :)
 ## Args
 ```
 USAGE:
-    gcoma --config-file-path <CONFIG_FILE_PATH>
+    gcoma [OPTIONS] --user-config <USER_CONFIG>
 
 OPTIONS:
-    -c, --config-file-path <CONFIG_FILE_PATH>
-    -h, --help                                   Print help information
-    -V, --version                                Print version information
+    -c, --connect <SESSION_INDEX>
+    -h, --help
+    -l, --list
+    -r, --remove <SESSION_INDEX>
+    -u, --user-config <USER_CONFIG>
+    -V, --version
 ```
 
 ## Screenshot
