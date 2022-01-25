@@ -15,7 +15,7 @@ OPTIONS:
     -c, --connect <SESSION_INDEX>
     -h, --help
     -l, --list
-    -r, --remove <SESSION_INDEX>
+    -r, --remove <SESSION_GROUP_NAME>
     -u, --user-config <USER_CONFIG>
     -V, --version
 ```

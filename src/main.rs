@@ -7,6 +7,9 @@ mod reqs_check;
 mod session_core;
 mod ui;
 
+use crate::ui::cli::UI;
+use crate::ui::ui_traits::*;
+
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
@@ -26,7 +29,7 @@ struct Args {
     #[clap(
         short,
         long,
-        value_name = "SESSION_INDEX",
+        value_name = "SESSION_GROUP_NAME",
         default_value = "",
         conflicts_with_all = &["list", "connect"],
         help = "Remove session group by name"
@@ -47,12 +50,12 @@ fn main() {
     let args = Args::parse();
 
     if args.user_config != "" {
-        let mut ui = ui::core_ui::UI::new(&args.user_config);
+        let mut ui = UI::new(args.user_config.trim());
 
         if args.list {
-            ui.print_sessions(1, true);
+            ui.list_all_sessions();
         } else if args.connect >= 0 {
-            ui.connect_to_session(args.connect as usize);
+            ui.connect_to_session_by_index(args.connect as usize);
         } else if args.remove != "" {
             ui.remove_session_group_by_name(&args.remove);
         } else {
