@@ -19,11 +19,10 @@ pub struct UI {
 }
 
 impl UI {
-    fn sgs_to_vec_str(&self, left_padding: usize) -> Vec<String> {
+    fn sgs_to_vec_str(config: &Config, left_padding: usize) -> Vec<String> {
         let mut output: Vec<String> = Vec::new();
 
-        let sg_name_max_len = self
-            .config
+        let sg_name_max_len = config
             .session_groups
             .iter()
             .map(|x| x.name.len())
@@ -39,15 +38,14 @@ impl UI {
         let mut sg_name_len: usize;
 
         // this loop will cause lots of heap allocations
-        for sg in &self.config.session_groups {
+        for sg in &config.session_groups {
             sg_name_len = sg.name.len();
-            line = self.config.colors.success().paint(&sg.name).to_string();
+            line = config.colors.success().paint(&sg.name).to_string();
             line_len = line.len();
 
             last_i = i;
             for session in &sg.sessions {
-                line_sub = self
-                    .config
+                line_sub = config
                     .colors
                     .primary()
                     .paint(format!("{}: {}", i, session.name))
@@ -64,7 +62,7 @@ impl UI {
                 output.push(line);
 
                 // because none visible chars still count into the line's length
-                line = self.config.colors.success().paint("").to_string();
+                line = config.colors.success().paint("").to_string();
                 i += 1;
             }
 
@@ -162,7 +160,7 @@ impl CUI for UI {
 
 impl QUI for UI {
     fn list_all_sessions(&self) {
-        for line in &self.sgs_to_vec_str(0) {
+        for line in &UI::sgs_to_vec_str(&self.config, 0) {
             println!("{}", line);
         }
     }
@@ -197,7 +195,7 @@ impl FUI for UI {
             set_cursor_position!(0, 0);
 
             let all_sessions = self.sessions();
-            for line in &self.sgs_to_vec_str(12) {
+            for line in &UI::sgs_to_vec_str(&self.config, 12) {
                 println!("{}", line);
             }
 

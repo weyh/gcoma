@@ -78,7 +78,7 @@ fn port_test3() {
 }
 
 #[test]
-fn posrt_test4() {
+fn port_test4() {
     let session = Session::new(
         "session".to_string(),
         "192.168.0.1".to_string(),
