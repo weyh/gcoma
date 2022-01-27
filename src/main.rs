@@ -1,41 +1,13 @@
-use clap::Parser;
-
 #[cfg(test)]
 mod tests;
 
+mod args;
 mod reqs_check;
 mod session_core;
 mod ui;
 
 use crate::ui::cli::UI;
 use crate::ui::ui_traits::*;
-
-#[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
-struct Args {
-    #[clap(short, long, required = true)]
-    user_config: String,
-    #[clap(short, long, conflicts_with_all = &["connect", "remove"])]
-    list: bool,
-    #[clap(
-        short,
-        long,
-        value_name = "SESSION_INDEX",
-        default_value = "-1",
-        conflicts_with_all = &["list", "remove"],
-        help = "Connect to session by index"
-    )]
-    connect: i64,
-    #[clap(
-        short,
-        long,
-        value_name = "SESSION_GROUP_NAME",
-        default_value = "",
-        conflicts_with_all = &["list", "connect"],
-        help = "Remove session group by name"
-    )]
-    remove: String,
-}
 
 fn main() {
     if !reqs_check::is_in_env("ssh") {
@@ -47,17 +19,21 @@ fn main() {
         return;
     }
 
-    let args = Args::parse();
+    let matches = args::get_args();
 
-    if args.user_config != "" {
-        let mut ui = UI::new(args.user_config.trim());
+    let user_config = matches.value_of("user_config").unwrap();
+    if user_config != "" {
+        let mut ui = UI::new(user_config.trim());
 
-        if args.list {
+        if matches.is_present("list") {
             ui.list_all_sessions();
-        } else if args.connect >= 0 {
-            ui.connect_to_session_by_index(args.connect as usize);
-        } else if args.remove != "" {
-            ui.remove_session_group_by_name(&args.remove);
+        } else if matches.is_present("connect") {
+            match matches.value_of("connect").unwrap().parse::<usize>() {
+                Ok(index) => ui.connect_to_session_by_index(index),
+                Err(e) => eprintln!("Couldn't parse index, {}", e),
+            }
+        } else if matches.is_present("remove") {
+            ui.remove_session_group_by_name(matches.value_of("remove").unwrap());
         } else {
             ui.main_menu();
         }

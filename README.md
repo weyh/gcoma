@@ -12,12 +12,12 @@ USAGE:
     gcoma [OPTIONS] --user-config <USER_CONFIG>
 
 OPTIONS:
-    -c, --connect <SESSION_INDEX>
-    -h, --help
-    -l, --list
-    -r, --remove <SESSION_GROUP_NAME>
-    -u, --user-config <USER_CONFIG>
-    -V, --version
+    -c, --connect <SESSION_INDEX>        Connect to session by index
+    -h, --help                           Print help information
+    -l, --list                           List all sessions
+    -r, --remove <SESSION_GROUP_NAME>    Remove session group by name
+    -u, --user-config <USER_CONFIG>      Path to user config file
+    -V, --version                        Print version information
 ```
 
 ## Screenshot
