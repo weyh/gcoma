@@ -4,14 +4,14 @@ use std::fs;
 use std::io::Write;
 use std::{thread, time};
 
+use super::config::Config;
+use super::config::UIColors;
 use crate::session_core::connection_type::ConnectionType;
 use crate::session_core::session::Session;
 use crate::session_core::session_group::SessionGroup;
-use crate::ui::config::Config;
-use crate::ui::config::UIColors;
 
-use crate::ui::ui_macros::*;
-use crate::ui::ui_traits::*;
+use super::ui_macros::*;
+use super::ui_traits::*;
 
 pub struct UI {
     pub path: String,
@@ -124,7 +124,7 @@ impl UI {
         let mut data = String::new();
         print_flush!(
             "{}",
-            self.config.colors.primary().paint("<user>@<ip>:<port> : ")
+            self.config.colors.primary().paint("<user>@<ip>:<port> :")
         );
         stdin_read_line!(&mut data);
 
@@ -161,7 +161,7 @@ impl CUI for UI {
 impl QUI for UI {
     fn list_all_sessions(&self) {
         for line in &UI::sgs_to_vec_str(&self.config, 0) {
-            println!("{}", line);
+            println!("{line}");
         }
     }
 
@@ -192,17 +192,17 @@ impl FUI for UI {
 
         loop {
             clear_screen!();
-            set_cursor_position!(0, 0);
+            set_cursor_position!(1, 1);
 
             let all_sessions = self.sessions();
             for line in &UI::sgs_to_vec_str(&self.config, 12) {
-                println!("{}", line);
+                println!("{line}");
             }
 
-            set_cursor_position!(0, 0);
-            println!("{}", menu_text);
+            set_cursor_position!(1, 1);
+            println!("{menu_text}");
 
-            set_cursor_position!(0, cmp::max(all_sessions.len(), 4));
+            set_cursor_position!(1, cmp::max(all_sessions.len(), 4));
             print_flush!("\n\n{}", self.config.colors.highlight().paint("Select: "));
             stdin_read_line!(&mut user_input);
 
@@ -221,22 +221,22 @@ impl FUI for UI {
                 "R" => {
                     self.config = self.load();
                 }
-                _ => {
-                    if user_input.trim().parse::<usize>().is_ok() {
-                        let index = user_input.trim().parse::<usize>().unwrap();
+                input => match input.parse::<usize>() {
+                    Ok(index) => {
                         if index < all_sessions.len() {
                             all_sessions[index].connect();
                             thread::sleep(time::Duration::from_millis(1000));
                         }
                     }
-                }
+                    Err(_) => {}
+                },
             }
         }
     }
 
     fn add_menu(&mut self) {
         clear_screen!();
-        set_cursor_position!(0, 0);
+        set_cursor_position!(1, 1);
         println!(
             "{}",
             self.config
@@ -291,7 +291,7 @@ impl FUI for UI {
     fn remove_menu(&mut self) {
         let colors: &UIColors = &self.config.colors;
         clear_screen!();
-        set_cursor_position!(0, 0);
+        set_cursor_position!(1, 1);
         println!("{}", colors.success().paint("--- Remove Session Group ---"));
 
         for session in &self.config.session_groups {

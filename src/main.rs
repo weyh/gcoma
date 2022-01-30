@@ -6,8 +6,8 @@ mod reqs_check;
 mod session_core;
 mod ui;
 
-use crate::ui::cli::UI;
-use crate::ui::ui_traits::*;
+use ui::cli::UI;
+use ui::ui_traits::*;
 
 fn main() {
     if !reqs_check::is_in_env("ssh") {
@@ -30,7 +30,7 @@ fn main() {
         } else if matches.is_present("connect") {
             match matches.value_of("connect").unwrap().parse::<usize>() {
                 Ok(index) => ui.connect_to_session_by_index(index),
-                Err(e) => eprintln!("Couldn't parse index, {}", e),
+                Err(e) => eprintln!("Couldn't parse index, {e}"),
             }
         } else if matches.is_present("remove") {
             ui.remove_session_group_by_name(matches.value_of("remove").unwrap());

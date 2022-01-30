@@ -19,6 +19,12 @@ impl Session {
         }
     }
 
+    pub fn get_user_name(&self) -> String {
+        let end = self.data.find("@").unwrap_or(0);
+
+        self.data[..end].to_string()
+    }
+
     pub fn get_ip(&self) -> String {
         let mut start = self.data.find("@").unwrap_or(0);
         let end = self.data.find(":").unwrap_or(self.data.len());
@@ -46,18 +52,25 @@ impl Session {
 
     pub fn connect(&self) {
         let prog = self.connection_type.to_string();
-        let args: [String; 2];
+        let mut args: Vec<String> = vec![self.get_ip()];
 
         match self.connection_type {
             ConnectionType::SSH => {
-                args = [self.data.clone(), String::new()];
+                args.push("-p".to_string());
+                args.push(self.get_port());
+
+                let usr_name = self.get_user_name();
+                if usr_name != "" {
+                    args.push("-l".to_string());
+                    args.push(usr_name);
+                }
             }
             ConnectionType::Telnet => {
-                args = [self.get_ip(), self.get_port()];
+                args.push(self.get_port());
             }
         }
 
-        let mut child = Command::new(prog).args(args).spawn().unwrap();
+        let mut child = Command::new(prog).args(&args).spawn().unwrap();
         let _ = child.wait().unwrap();
     }
 }
