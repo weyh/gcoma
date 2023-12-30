@@ -1,7 +1,7 @@
-use clap::{App, Arg};
+use clap::{Arg, ArgMatches, Command};
 
-pub fn get_args() -> clap::ArgMatches {
-    return App::new(env!("CARGO_CRATE_NAME"))
+pub fn get_args() -> ArgMatches {
+    return Command::new(env!("CARGO_CRATE_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .arg(
             Arg::new("user_config")
