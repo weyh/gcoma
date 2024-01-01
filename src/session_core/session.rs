@@ -3,7 +3,7 @@ use std::process::Command;
 
 use super::connection_type::ConnectionType;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Session {
     pub name: String,
     pub data: String,

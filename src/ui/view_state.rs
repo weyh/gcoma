@@ -1,14 +1,16 @@
 use super::config::Config;
 use ratatui::widgets::TableState;
 
-pub struct ViewState<'a> {
+pub struct ViewState {
+    pub show_popup: bool,
     pub table_state: TableState,
-    pub config: &'a Config,
+    pub config: Config,
 }
 
-impl<'a> ViewState<'a> {
-    pub fn new(config: &Config) -> ViewState {
+impl ViewState {
+    pub fn new(config: Config) -> ViewState {
         ViewState {
+            show_popup: false,
             table_state: TableState::default(),
             config,
         }

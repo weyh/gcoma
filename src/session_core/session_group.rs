@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::session::Session;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SessionGroup {
     pub name: String,
     pub sessions: Vec<Session>,

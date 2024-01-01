@@ -12,3 +12,4 @@ Cargo.lock
 .vscode
 
 *.json
+*.bak
