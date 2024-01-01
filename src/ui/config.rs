@@ -15,4 +15,9 @@ impl Config {
             session_groups: Vec::new(),
         }
     }
+
+    pub fn save(self, path: &str) {
+        let cfg_str = serde_json::to_string_pretty(&self).unwrap();
+        std::fs::write(path, cfg_str).unwrap();
+    }
 }

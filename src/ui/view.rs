@@ -11,48 +11,25 @@ use std::{fs, vec};
 use super::config::Config;
 use super::view_state::ViewState;
 
-struct MenuAction {
-    pub name: &'static str,
-    pub action_key: char,
-    pub action: fn(&str, &mut ViewState) -> io::Result<bool>,
-}
+const HELP_MENU_TEXT: &str = "\
+Navigate:
+  j/↑: Down
+  k/↓: Up
+  Enter: Select
 
-const MENU_ACTIONS: [&MenuAction; 4] = [
-    &MenuAction {
-        name: "Quit",
-        action_key: 'q',
-        action: |cfg_path: &str, state: &mut ViewState| {
-            let cfg_str = serde_json::to_string(state.config).unwrap();
-            fs::write(cfg_path, cfg_str).unwrap();
-            Ok(true)
-        },
-    },
-    &MenuAction {
-        name: "Add",
-        action_key: 'a',
-        action: |cfg_path: &str, state: &mut ViewState| panic!("Not implemented!"),
-    },
-    &MenuAction {
-        name: "Remove",
-        action_key: 'r',
-        action: |cfg_path: &str, state: &mut ViewState| panic!("Not implemented!"),
-    },
-    &MenuAction {
-        name: "Reload",
-        action_key: 'R',
-        action: |cfg_path: &str, state: &mut ViewState| panic!("Not implemented!"),
-    },
-];
+Actions:
+  q: Quit
+  a: Add
+  r: Remove
+  R: Reload";
 
 fn handle_events(cfg_path: &str, state: &mut ViewState) -> io::Result<bool> {
     if event::poll(std::time::Duration::from_millis(50))? {
         if let Event::Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Press {
-                // Menu actions
-                for menu_action in MENU_ACTIONS.iter() {
-                    if key.code == KeyCode::Char(menu_action.action_key) {
-                        return (menu_action.action)(cfg_path, state);
-                    }
+                // Quit
+                if key.code == KeyCode::Char('q') {
+                    return Ok(true);
                 }
 
                 // Vertical scroll
@@ -80,38 +57,28 @@ fn ui(state: &mut ViewState, frame: &mut Frame) {
         Block::new()
             .borders(Borders::TOP)
             .title(env!("CARGO_CRATE_NAME"))
-            .bold(),
+            .bold()
+            .green(),
         root_layout[0],
     );
 
     let inner_layout = Layout::new(
         Direction::Horizontal,
-        // menu                      sessions
-        [Constraint::Percentage(30), Constraint::Percentage(70)],
+        // table                      help
+        [Constraint::Percentage(70), Constraint::Percentage(70)],
     )
     .split(root_layout[1]);
 
     // Menu
-    let left_inner_layout = Layout::new(
-        Direction::Vertical,
-        MENU_ACTIONS.map(|_| Constraint::Length(1)),
-    )
-    .split(inner_layout[0]);
+    let paragraph = Paragraph::new(HELP_MENU_TEXT)
+        .block(Block::default().title("Help").dim().borders(Borders::ALL));
 
-    for (i, menu_action) in MENU_ACTIONS.iter().enumerate() {
-        frame.render_widget(
-            Paragraph::new(format!(
-                "{0}: {1}",
-                menu_action.action_key, menu_action.name
-            )),
-            left_inner_layout[i],
-        );
-    }
+    frame.render_widget(paragraph, inner_layout[1]);
 
     // Sessions table
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
     let normal_style = Style::default().bg(Color::Blue);
-    let header_cells = ["Group", "Session Name", "Username", "IP", "Port"]
+    let header_cells = ["Group Name", "Session Name", "Username", "IP", "Port"]
         .iter()
         .map(|h| Cell::from(*h).style(Style::default().fg(Color::Red)));
 
@@ -155,10 +122,11 @@ fn ui(state: &mut ViewState, frame: &mut Frame) {
         ],
     )
     .header(header)
+    .block(Block::default().borders(Borders::ALL).title("Sessions"))
     .highlight_style(selected_style)
     .highlight_symbol(">> ");
 
-    frame.render_stateful_widget(t, inner_layout[1], &mut state.table_state);
+    frame.render_stateful_widget(t, inner_layout[0], &mut state.table_state);
 }
 
 pub fn display(cfg_path: &str) -> io::Result<()> {
