@@ -1,7 +1,7 @@
 use crossterm::{
-    event::{self, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
 };
 use ratatui::{prelude::*, widgets::*};
 use serde_json;
@@ -13,15 +13,15 @@ use super::view_state::ViewState;
 
 const HELP_MENU_TEXT: &str = "\
 Navigate:
-  j/↑: Down
-  k/↓: Up
-  Enter: Select
+  j/↑: down
+  k/↓: up
+  Enter: select
 
 Actions:
-  q: Quit
-  a: Add Session Group
-  r: Remove
-  R: Reload";
+  q/ESC: quit
+      a: add Session Group
+      r: remove
+      R: Reload config";
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
 fn create_centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
@@ -79,40 +79,45 @@ fn handle_events(cfg_path: &str, state: &mut ViewState) -> io::Result<bool> {
     if event::poll(std::time::Duration::from_millis(50))? {
         if let Event::Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Press {
-                // Quit
-                if key.code == KeyCode::Char('q') {
-                    if !state.show_popup {
-                        return Ok(true);
+                if !state.popup_state.is_open() {
+                    match key.code {
+                        KeyCode::Char('q') | KeyCode::Esc => {
+                            // Quit
+                            return Ok(true);
+                        }
+                        KeyCode::Char('a') => state.popup_state.show(),
+                        KeyCode::Char('r') => remove_selected(state),
+                        KeyCode::Char('R') => {
+                            state.config = load_cfg_from_file(cfg_path).unwrap_or(Config::new());
+                        }
+                        KeyCode::Enter => panic!("Not implemented yet!"),
+                        KeyCode::Down | KeyCode::Char('j') => state.next(),
+                        KeyCode::Up | KeyCode::Char('k') => state.previous(),
+                        _ => {}
                     }
-
-                    state.show_popup = false;
-                }
-
-                if state.show_popup {
-                    // if popup is shown, don't handle any events below
-                    return Ok(false);
-                }
-
-                // Add Session Group
-                if key.code == KeyCode::Char('a') {
-                    state.show_popup = true;
-                }
-
-                // Remove
-                if key.code == KeyCode::Char('r') {
-                    remove_selected(state);
-                }
-
-                // Reload
-                if key.code == KeyCode::Char('R') {
-                    state.config = load_cfg_from_file(cfg_path).unwrap_or(Config::new());
-                }
-
-                // Vertical scroll
-                if key.code == KeyCode::Down || key.code == KeyCode::Char('j') {
-                    state.next();
-                } else if key.code == KeyCode::Up || key.code == KeyCode::Char('k') {
-                    state.previous();
+                } else {
+                    match key.code {
+                        KeyCode::Char('q') | KeyCode::Esc => {
+                            // Close popup
+                            state.popup_state.reset_state();
+                        }
+                        KeyCode::Enter => {
+                            state.popup_state.submit_data();
+                        }
+                        KeyCode::Char(to_insert) => {
+                            state.popup_state.enter_char(to_insert);
+                        }
+                        KeyCode::Backspace => {
+                            state.popup_state.delete_char();
+                        }
+                        KeyCode::Left => {
+                            state.popup_state.move_cursor_left();
+                        }
+                        KeyCode::Right => {
+                            state.popup_state.move_cursor_right();
+                        }
+                        _ => {}
+                    }
                 }
             }
         }
@@ -121,37 +126,7 @@ fn handle_events(cfg_path: &str, state: &mut ViewState) -> io::Result<bool> {
     Ok(false)
 }
 
-fn ui(state: &mut ViewState, frame: &mut Frame) {
-    let root_layout = Layout::new(
-        Direction::Vertical,
-        [Constraint::Length(1), Constraint::Min(0)],
-    )
-    .split(frame.size());
-
-    // Title
-    frame.render_widget(
-        Block::new()
-            .borders(Borders::TOP)
-            .title(env!("CARGO_CRATE_NAME"))
-            .bold()
-            .green(),
-        root_layout[0],
-    );
-
-    let inner_layout = Layout::new(
-        Direction::Horizontal,
-        // table                      help
-        [Constraint::Percentage(70), Constraint::Percentage(70)],
-    )
-    .split(root_layout[1]);
-
-    // Menu
-    let paragraph = Paragraph::new(HELP_MENU_TEXT)
-        .block(Block::default().title("Help").dim().borders(Borders::ALL));
-
-    frame.render_widget(paragraph, inner_layout[1]);
-
-    // Sessions table
+fn table_ui(state: &mut ViewState, frame: &mut Frame, area: &Rect) {
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
     let normal_style = Style::default().bg(Color::Blue);
     let header_cells = ["Group Name", "Session Name", "Username", "IP", "Port"]
@@ -202,16 +177,68 @@ fn ui(state: &mut ViewState, frame: &mut Frame) {
     .highlight_style(selected_style)
     .highlight_symbol(">> ");
 
-    frame.render_stateful_widget(t, inner_layout[0], &mut state.table_state);
+    frame.render_stateful_widget(t, *area, &mut state.table_state);
+}
+
+fn popup_ui(state: &mut ViewState, frame: &mut Frame) {
+    let text = vec![
+        Line::from("This is a line "),
+        Line::from("This is a line "),
+        Line::from("This is a line "),
+    ];
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .gray()
+        .title(Span::styled(
+            "Add session group",
+            Style::default().add_modifier(Modifier::BOLD),
+        ));
+
+    let area = create_centered_rect(50, 50, frame.size());
+
+    frame.render_widget(Clear, area); // this clears out the background
+
+    let paragraph = Paragraph::new(text.clone()).gray().block(block);
+    frame.render_widget(paragraph, area);
+}
+
+fn ui(state: &mut ViewState, frame: &mut Frame) {
+    let root_layout = Layout::new(
+        Direction::Vertical,
+        [Constraint::Length(1), Constraint::Min(0)],
+    )
+    .split(frame.size());
+
+    // Title
+    frame.render_widget(
+        Block::new()
+            .borders(Borders::TOP)
+            .title(env!("CARGO_CRATE_NAME"))
+            .bold()
+            .green(),
+        root_layout[0],
+    );
+
+    let inner_layout = Layout::new(
+        Direction::Horizontal,
+        // table                      help
+        [Constraint::Percentage(70), Constraint::Percentage(70)],
+    )
+    .split(root_layout[1]);
+
+    // Menu
+    let paragraph = Paragraph::new(HELP_MENU_TEXT)
+        .block(Block::default().title("Help").dim().borders(Borders::ALL));
+
+    frame.render_widget(paragraph, inner_layout[1]);
+
+    // Sessions table
+    table_ui(state, frame, &inner_layout[0]);
 
     // Popup (add session group)
-    if state.show_popup {
-        let block = Block::default()
-            .title("Add session group")
-            .borders(Borders::ALL);
-        let area = create_centered_rect(50, 50, frame.size());
-        frame.render_widget(Clear, area); // this clears out the background
-        frame.render_widget(block, area);
+    if state.popup_state.is_open() {
+        popup_ui(state, frame)
     }
 }
 
@@ -219,7 +246,7 @@ pub fn display(cfg_path: &str) -> io::Result<()> {
     let mut state = ViewState::new(load_cfg_from_file(cfg_path).unwrap_or(Config::new()));
 
     enable_raw_mode()?;
-    stdout().execute(EnterAlternateScreen)?;
+    execute!(stdout(), EnterAlternateScreen, EnableMouseCapture)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
 
     let mut should_quit = false;
@@ -229,7 +256,12 @@ pub fn display(cfg_path: &str) -> io::Result<()> {
     }
 
     disable_raw_mode()?;
-    stdout().execute(LeaveAlternateScreen)?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
 
     state.config.save(cfg_path);
     Ok(())
