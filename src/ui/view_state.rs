@@ -1,30 +1,145 @@
+use crate::session_core::{
+    connection_type::ConnectionType,
+    session::{Session, SessionBuilder},
+    session_group::{SessionGroup, SessionGroupBuilder},
+};
+
 use super::config::Config;
 use ratatui::widgets::TableState;
-use std::collections::HashMap;
 
-pub struct PopupState {
+#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[repr(u8)]
+pub enum PopupBuilderState {
+    SessionGroupName = 0,
+
+    SessionName,
+    SessionConnectionType,
+    SessionData,
+    SessionAddConfirm,
+
+    SessionAddMore,
+
+    SessionGroupConfirm,
+    Done,
+}
+
+impl From<u8> for PopupBuilderState {
+    fn from(val: u8) -> Self {
+        match val {
+            0 => PopupBuilderState::SessionGroupName,
+            1 => PopupBuilderState::SessionName,
+            2 => PopupBuilderState::SessionConnectionType,
+            3 => PopupBuilderState::SessionData,
+            4 => PopupBuilderState::SessionAddConfirm,
+            5 => PopupBuilderState::SessionAddMore,
+            6 => PopupBuilderState::SessionGroupConfirm,
+            _ => panic!("Invalid PopupBuilderState"),
+        }
+    }
+}
+
+const NEW_SG_PROMPTS: [(&str, &str); (PopupBuilderState::Done as usize) + 1] = [
+    (
+        "Session Group Name:",
+        "Enter an easy to understand name for the session group...",
+    ), // SessionGroupName
+    (
+        "Session Name:",
+        "Enter an easy to understand name for the session...",
+    ), // SessionName
+    (
+        "Session Type (TELNET/SSH):",
+        "Enter either 'telnet' or 'ssh'",
+    ), // SessionConnectionType
+    ("Connection data:", "username@ip:port"), // SessionData
+    ("Add session? (y/n)", ""),               // SessionAddConfirm
+    ("Add another session? (y/n)", ""),       // SessionAddMore
+    ("Add session group? (y/n)", ""),         // SessionGroupConfirm
+    ("Session group has been created", ""),   // Done
+];
+
+pub struct PopupState<'a> {
     /// if true edeting is enabled
     open: bool,
-    key: String,
-    input: String,
-    cursor_position: usize,
-    temp_session_group: HashMap<String, String>,
+    session_group_builder: SessionGroupBuilder,
+    session_builder: Option<SessionBuilder>,
+    sg_prompt_index: usize,
+    pub textarea: tui_textarea::TextArea<'a>,
+
+    pub temp_session_group: Option<SessionGroup>,
 }
 
-pub struct ViewState {
+pub struct ViewState<'a> {
     pub table_state: TableState,
     pub config: Config,
-    pub popup_state: PopupState,
+    pub popup_state: PopupState<'a>,
 }
 
-impl PopupState {
-    pub fn new() -> PopupState {
+impl<'a> PopupState<'a> {
+    pub fn new() -> PopupState<'a> {
         PopupState {
             open: false,
-            key: String::new(),
-            input: String::new(),
-            cursor_position: 0,
-            temp_session_group: HashMap::new(),
+            session_group_builder: SessionGroup::builder(),
+            session_builder: None,
+            sg_prompt_index: 0,
+            textarea: tui_textarea::TextArea::default(),
+
+            temp_session_group: None,
+        }
+    }
+
+    pub fn get_state(&self) -> PopupBuilderState {
+        PopupBuilderState::from(self.sg_prompt_index as u8)
+    }
+
+    pub fn get_prompt(&self) -> Option<(&'static str, &'static str)> {
+        if self.sg_prompt_index < NEW_SG_PROMPTS.len() {
+            return Some(NEW_SG_PROMPTS[self.sg_prompt_index]);
+        }
+
+        None
+    }
+
+    pub fn increment_prompt(&mut self) {
+        self.clear_textarea();
+        self.sg_prompt_index += 1;
+    }
+
+    pub fn push_data(&mut self, data: &String) {
+        match PopupBuilderState::from(self.sg_prompt_index as u8) {
+            PopupBuilderState::SessionGroupName => {
+                self.session_group_builder.name(data.clone());
+            }
+            PopupBuilderState::SessionName => {
+                let mut session_builder = Session::builder();
+                session_builder.name(data.clone());
+
+                self.session_builder = Some(session_builder);
+            }
+            PopupBuilderState::SessionConnectionType => {
+                let t = if data.to_lowercase() == "telnet" {
+                    ConnectionType::Telnet
+                } else {
+                    ConnectionType::SSH
+                };
+                self.session_builder.as_mut().unwrap().connection_type(t);
+            }
+            PopupBuilderState::SessionData => {
+                self.session_builder.as_mut().unwrap().data(data.clone());
+            }
+            PopupBuilderState::SessionAddConfirm => {
+                let sb = self.session_builder.take().unwrap();
+                self.session_group_builder.add_session(sb);
+            }
+            PopupBuilderState::SessionAddMore => {
+                self.sg_prompt_index = PopupBuilderState::SessionName as usize;
+            }
+            PopupBuilderState::SessionGroupConfirm => {
+                self.temp_session_group = Some(self.session_group_builder.build());
+                self.session_group_builder = SessionGroup::builder();
+                self.session_builder = None;
+            }
+            _ => {}
         }
     }
 
@@ -40,82 +155,33 @@ impl PopupState {
         self.open = true;
     }
 
+    pub fn clear_textarea(&mut self) {
+        // is there no clear method?
+        self.textarea.move_cursor(tui_textarea::CursorMove::End);
+        while self.textarea.delete_char() {}
+    }
+
     pub fn reset_state(&mut self) {
+        self.clear_textarea();
         self.hide();
-        self.key = String::new();
-        self.input = String::new();
-        self.cursor_position = 0;
-        self.temp_session_group = HashMap::new();
-    }
 
-    pub fn move_cursor_left(&mut self) {
-        let cursor_moved_left = self.cursor_position.saturating_sub(1);
-        self.cursor_position = self.clamp_cursor(cursor_moved_left);
-    }
-
-    pub fn move_cursor_right(&mut self) {
-        let cursor_moved_right = self.cursor_position.saturating_add(1);
-        self.cursor_position = self.clamp_cursor(cursor_moved_right);
-    }
-
-    pub fn enter_char(&mut self, new_char: char) {
-        self.input.insert(self.cursor_position, new_char);
-
-        self.move_cursor_right();
-    }
-
-    pub fn delete_char(&mut self) {
-        let is_not_cursor_leftmost = self.cursor_position != 0;
-        if is_not_cursor_leftmost {
-            // Method "remove" is not used on the saved text for deleting the selected char.
-            // Reason: Using remove on String works on bytes instead of the chars.
-            // Using remove would require special care because of char boundaries.
-
-            let current_index = self.cursor_position;
-            let from_left_to_current_index = current_index - 1;
-
-            // Getting all characters before the selected character.
-            let before_char_to_delete = self.input.chars().take(from_left_to_current_index);
-            // Getting all characters after selected character.
-            let after_char_to_delete = self.input.chars().skip(current_index);
-
-            // Put all characters together except the selected one.
-            // By leaving the selected one out, it is forgotten and therefore deleted.
-            self.input = before_char_to_delete.chain(after_char_to_delete).collect();
-            self.move_cursor_left();
-        }
-    }
-
-    pub fn clamp_cursor(&self, new_cursor_pos: usize) -> usize {
-        new_cursor_pos.clamp(0, self.input.len())
-    }
-
-    pub fn reset_cursor(&mut self) {
-        self.cursor_position = 0;
-    }
-
-    pub fn set_key(&mut self, key: String) {
-        self.key = key;
-    }
-
-    pub fn submit_data(&mut self) {
-        self.temp_session_group
-            .insert(self.key.clone(), self.input.clone());
-        self.input.clear();
-        self.reset_cursor();
-    }
-
-    pub fn get_temp_session_group(&self) -> &HashMap<String, String> {
-        return &self.temp_session_group;
+        self.session_group_builder = SessionGroup::builder();
+        self.sg_prompt_index = 0;
     }
 }
 
-impl ViewState {
-    pub fn new(config: Config) -> ViewState {
+impl<'a> ViewState<'a> {
+    pub fn new(config: Config) -> ViewState<'a> {
         ViewState {
             table_state: TableState::default(),
             config,
             popup_state: PopupState::new(),
+        }
+    }
+
+    pub fn add_temp_session_group_to_cfg(&mut self) {
+        if let Some(sg) = self.popup_state.temp_session_group.take() {
+            self.config.session_groups.push(sg);
         }
     }
 

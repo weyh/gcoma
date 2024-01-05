@@ -19,6 +19,10 @@ impl Session {
         }
     }
 
+    pub fn builder() -> SessionBuilder {
+        SessionBuilder::new()
+    }
+
     pub fn get_user_name(&self) -> String {
         let end = self.data.find("@").unwrap_or(0);
 
@@ -72,5 +76,44 @@ impl Session {
 
         let mut child = Command::new(prog).args(&args).spawn().unwrap();
         let _ = child.wait().unwrap();
+    }
+}
+
+pub struct SessionBuilder {
+    name: String,
+    data: String,
+    connection_type: ConnectionType,
+}
+
+impl SessionBuilder {
+    fn new() -> SessionBuilder {
+        SessionBuilder {
+            name: "".to_string(),
+            data: "".to_string(),
+            connection_type: ConnectionType::SSH,
+        }
+    }
+
+    pub fn name(&mut self, name: String) -> &mut SessionBuilder {
+        self.name = name;
+        return self;
+    }
+
+    pub fn data(&mut self, data: String) -> &mut SessionBuilder {
+        self.data = data;
+        return self;
+    }
+
+    pub fn connection_type(&mut self, connection_type: ConnectionType) -> &mut SessionBuilder {
+        self.connection_type = connection_type;
+        return self;
+    }
+
+    pub fn build(&self) -> Session {
+        Session::new(
+            self.name.clone(),
+            self.data.clone(),
+            self.connection_type.clone(),
+        )
     }
 }
