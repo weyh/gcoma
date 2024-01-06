@@ -11,8 +11,11 @@ use tui_textarea::{Input, Key};
 
 use crate::session_core::session::Session;
 
-use super::view_state::{PopupStateAction, ViewState};
-use super::{config::Config, view_state::PopupBuilderState};
+use super::view_state::ViewState;
+use super::{
+    config::Config,
+    popup_state::{PopupBuilderState, PopupStateAction},
+};
 
 const HELP_MENU_TEXT: &str = "\
 Navigate:
