@@ -110,6 +110,7 @@ pub struct ViewState<'a> {
     pub table_state: TableState,
     pub config: Config,
     pub popup_state: PopupState<'a>,
+    pub connected: bool,
 }
 
 impl<'a> PopupState<'a> {
@@ -241,6 +242,7 @@ impl<'a> ViewState<'a> {
             table_state: TableState::default(),
             config,
             popup_state: PopupState::new(),
+            connected: false,
         }
     }
 

@@ -5,9 +5,11 @@ use crossterm::{
 };
 use ratatui::{prelude::*, widgets::*};
 use serde_json;
-use std::io::{self, stdout};
+use std::io::{self, stdout, Stdout};
 use std::{fs, vec};
 use tui_textarea::{Input, Key};
+
+use crate::session_core::session::Session;
 
 use super::view_state::{PopupStateAction, ViewState};
 use super::{config::Config, view_state::PopupBuilderState};
@@ -76,6 +78,31 @@ fn remove_selected(state: &mut ViewState) {
     }
 }
 
+fn find_selected(state: &mut ViewState) -> Option<Session> {
+    let mut selected_idx = match state.table_state.selected() {
+        Some(i) => i,
+        None => return None,
+    };
+
+    for session_group in state.config.session_groups.iter() {
+        if selected_idx == 0 {
+            return None;
+        }
+
+        selected_idx -= 1;
+
+        for session in session_group.sessions.iter() {
+            if selected_idx == 0 {
+                return Some(session.clone());
+            }
+
+            selected_idx -= 1;
+        }
+    }
+
+    None
+}
+
 fn handle_normal_mode_events(state: &mut ViewState, cfg_path: &str) -> io::Result<bool> {
     if let Event::Key(key) = event::read()? {
         if key.kind == event::KeyEventKind::Press {
@@ -89,7 +116,7 @@ fn handle_normal_mode_events(state: &mut ViewState, cfg_path: &str) -> io::Resul
                 KeyCode::Char('R') => {
                     state.config = load_cfg_from_file(cfg_path).unwrap_or(Config::new());
                 }
-                KeyCode::Enter => panic!("Not implemented yet!"),
+                KeyCode::Enter => state.connected = true,
                 KeyCode::Down | KeyCode::Char('j') => state.next(),
                 KeyCode::Up | KeyCode::Char('k') => state.previous(),
                 _ => {}
@@ -338,6 +365,42 @@ fn ui(state: &mut ViewState, frame: &mut Frame) {
     }
 }
 
+fn connect_selected_ui(
+    state: &mut ViewState,
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+) -> io::Result<()> {
+    let session = match find_selected(state) {
+        Some(s) => s,
+        None => {
+            state.connected = false;
+            return Ok(());
+        }
+    };
+
+    let text = format!("Connecting to {}", session.data);
+    execute!(terminal.backend_mut(), DisableMouseCapture)?;
+    terminal.draw(|frame| {
+        frame.render_widget(
+            Block::default().title(text).borders(Borders::TOP),
+            frame.size(),
+        )
+    })?;
+    terminal.set_cursor(0, 1)?;
+    terminal.show_cursor()?;
+
+    disable_raw_mode()?;
+    session.connect();
+    state.connected = false;
+    enable_raw_mode()?;
+
+    terminal.hide_cursor()?;
+    execute!(terminal.backend_mut(), EnableMouseCapture)?;
+    terminal.clear()?;
+    //terminal.draw(|frame| ui(state, frame))?; // redraw ui
+
+    Ok(())
+}
+
 pub fn display(cfg_path: &str) -> io::Result<()> {
     let mut state = ViewState::new(load_cfg_from_file(cfg_path).unwrap_or(Config::new()));
 
@@ -352,8 +415,12 @@ pub fn display(cfg_path: &str) -> io::Result<()> {
 
     let mut should_quit = false;
     while !should_quit {
-        terminal.draw(|frame| ui(&mut state, frame))?;
-        should_quit = handle_events(cfg_path, &mut state)?;
+        if !state.connected {
+            terminal.draw(|frame| ui(&mut state, frame))?;
+            should_quit = handle_events(cfg_path, &mut state)?;
+        } else {
+            connect_selected_ui(&mut state, &mut terminal)?;
+        }
     }
 
     disable_raw_mode()?;
