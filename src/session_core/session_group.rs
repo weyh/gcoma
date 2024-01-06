@@ -36,11 +36,6 @@ impl SessionGroupBuilder {
         return self;
     }
 
-    pub fn sessions(&mut self, sessions: Vec<SessionBuilder>) -> &mut SessionGroupBuilder {
-        self.sessions = sessions;
-        return self;
-    }
-
     pub fn add_session(&mut self, session: SessionBuilder) -> &mut SessionGroupBuilder {
         self.sessions.push(session);
         return self;

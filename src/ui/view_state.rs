@@ -1,3 +1,5 @@
+use std::{collections::HashMap, sync::OnceLock};
+
 use crate::session_core::{
     connection_type::ConnectionType,
     session::{Session, SessionBuilder},
@@ -7,7 +9,23 @@ use crate::session_core::{
 use super::config::Config;
 use ratatui::widgets::TableState;
 
-#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(PartialEq)]
+pub enum PopupStateAction<'a> {
+    StoreStr(&'a String),
+    Store,
+    Next,
+}
+
+impl<'a> PopupStateAction<'a> {
+    pub fn get_data(&self) -> &String {
+        match self {
+            PopupStateAction::StoreStr(s) => s,
+            _ => panic!("not a string"),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
 #[repr(u8)]
 pub enum PopupBuilderState {
     SessionGroupName = 0,
@@ -23,50 +41,69 @@ pub enum PopupBuilderState {
     Done,
 }
 
-impl From<u8> for PopupBuilderState {
-    fn from(val: u8) -> Self {
-        match val {
-            0 => PopupBuilderState::SessionGroupName,
-            1 => PopupBuilderState::SessionName,
-            2 => PopupBuilderState::SessionConnectionType,
-            3 => PopupBuilderState::SessionData,
-            4 => PopupBuilderState::SessionAddConfirm,
-            5 => PopupBuilderState::SessionAddMore,
-            6 => PopupBuilderState::SessionGroupConfirm,
-            _ => panic!("Invalid PopupBuilderState"),
-        }
-    }
-}
+fn sg_prompts() -> &'static HashMap<PopupBuilderState, (&'static str, &'static str)> {
+    static MAP: OnceLock<HashMap<PopupBuilderState, (&'static str, &'static str)>> =
+        OnceLock::new();
 
-const NEW_SG_PROMPTS: [(&str, &str); (PopupBuilderState::Done as usize) + 1] = [
-    (
-        "Session Group Name:",
-        "Enter an easy to understand name for the session group...",
-    ), // SessionGroupName
-    (
-        "Session Name:",
-        "Enter an easy to understand name for the session...",
-    ), // SessionName
-    (
-        "Session Type (TELNET/SSH):",
-        "Enter either 'telnet' or 'ssh'",
-    ), // SessionConnectionType
-    ("Connection data:", "username@ip:port"), // SessionData
-    ("Add session? (y/n)", ""),               // SessionAddConfirm
-    ("Add another session? (y/n)", ""),       // SessionAddMore
-    ("Add session group? (y/n)", ""),         // SessionGroupConfirm
-    ("Session group has been created", ""),   // Done
-];
+    MAP.get_or_init(|| {
+        let m = HashMap::from([
+            (
+                PopupBuilderState::SessionGroupName,
+                (
+                    "Session Group Name:",
+                    "Enter an easy to understand name for the session group...",
+                ),
+            ),
+            (
+                PopupBuilderState::SessionName,
+                (
+                    "Session Name:",
+                    "Enter an easy to understand name for the session...",
+                ),
+            ),
+            (
+                PopupBuilderState::SessionConnectionType,
+                (
+                    "Session Type (TELNET/SSH):",
+                    "Enter either 'telnet' or 'ssh'",
+                ),
+            ),
+            (
+                PopupBuilderState::SessionData,
+                ("Connection data:", "username@ip:port"),
+            ),
+            (
+                PopupBuilderState::SessionAddConfirm,
+                ("Add session? (y/n)", ""),
+            ),
+            (
+                PopupBuilderState::SessionAddMore,
+                ("Add another session? (y/n)", ""),
+            ),
+            (
+                PopupBuilderState::SessionGroupConfirm,
+                ("Add session group? (y/n)", ""),
+            ),
+            (
+                PopupBuilderState::Done,
+                ("Session group has been created", ""),
+            ),
+        ]);
+
+        m
+    })
+}
 
 pub struct PopupState<'a> {
     /// if true edeting is enabled
     open: bool,
     session_group_builder: SessionGroupBuilder,
     session_builder: Option<SessionBuilder>,
-    sg_prompt_index: usize,
+    sg_state: PopupBuilderState,
+
     pub textarea: tui_textarea::TextArea<'a>,
 
-    pub temp_session_group: Option<SessionGroup>,
+    temp_session_group: Option<SessionGroup>,
 }
 
 pub struct ViewState<'a> {
@@ -81,7 +118,8 @@ impl<'a> PopupState<'a> {
             open: false,
             session_group_builder: SessionGroup::builder(),
             session_builder: None,
-            sg_prompt_index: 0,
+
+            sg_state: PopupBuilderState::SessionGroupName,
             textarea: tui_textarea::TextArea::default(),
 
             temp_session_group: None,
@@ -89,58 +127,85 @@ impl<'a> PopupState<'a> {
     }
 
     pub fn get_state(&self) -> PopupBuilderState {
-        PopupBuilderState::from(self.sg_prompt_index as u8)
+        self.sg_state
     }
 
-    pub fn get_prompt(&self) -> Option<(&'static str, &'static str)> {
-        if self.sg_prompt_index < NEW_SG_PROMPTS.len() {
-            return Some(NEW_SG_PROMPTS[self.sg_prompt_index]);
-        }
-
-        None
+    pub fn get_prompt(&self) -> (&'static str, &'static str) {
+        let d = sg_prompts().get(&self.sg_state).unwrap();
+        return *d;
     }
 
-    pub fn increment_prompt(&mut self) {
-        self.clear_textarea();
-        self.sg_prompt_index += 1;
-    }
-
-    pub fn push_data(&mut self, data: &String) {
-        match PopupBuilderState::from(self.sg_prompt_index as u8) {
+    /// returns true if the state was changed
+    pub fn increment_state(&mut self, data: PopupStateAction) {
+        match self.sg_state {
             PopupBuilderState::SessionGroupName => {
-                self.session_group_builder.name(data.clone());
+                if data != PopupStateAction::Next {
+                    self.session_group_builder.name(data.get_data().clone());
+                }
+
+                self.sg_state = PopupBuilderState::SessionName;
             }
             PopupBuilderState::SessionName => {
-                let mut session_builder = Session::builder();
-                session_builder.name(data.clone());
+                if data != PopupStateAction::Next {
+                    let mut session_builder = Session::builder();
+                    session_builder.name(data.get_data().clone());
 
-                self.session_builder = Some(session_builder);
+                    self.session_builder = Some(session_builder);
+                }
+
+                self.sg_state = PopupBuilderState::SessionConnectionType;
             }
             PopupBuilderState::SessionConnectionType => {
-                let t = if data.to_lowercase() == "telnet" {
-                    ConnectionType::Telnet
-                } else {
-                    ConnectionType::SSH
-                };
-                self.session_builder.as_mut().unwrap().connection_type(t);
+                if data != PopupStateAction::Next {
+                    let t = if data.get_data().to_lowercase() == "telnet" {
+                        ConnectionType::Telnet
+                    } else {
+                        ConnectionType::SSH
+                    };
+
+                    self.session_builder.as_mut().unwrap().connection_type(t);
+                }
+
+                self.sg_state = PopupBuilderState::SessionData;
             }
             PopupBuilderState::SessionData => {
-                self.session_builder.as_mut().unwrap().data(data.clone());
+                if data != PopupStateAction::Next {
+                    self.session_builder
+                        .as_mut()
+                        .unwrap()
+                        .data(data.get_data().clone());
+                }
+
+                self.sg_state = PopupBuilderState::SessionAddConfirm;
             }
             PopupBuilderState::SessionAddConfirm => {
-                let sb = self.session_builder.take().unwrap();
-                self.session_group_builder.add_session(sb);
+                if data != PopupStateAction::Next {
+                    let sb = self.session_builder.take().unwrap();
+                    self.session_group_builder.add_session(sb);
+                }
+
+                self.sg_state = PopupBuilderState::SessionAddMore;
             }
             PopupBuilderState::SessionAddMore => {
-                self.sg_prompt_index = PopupBuilderState::SessionName as usize;
+                if data == PopupStateAction::Next {
+                    self.sg_state = PopupBuilderState::SessionGroupConfirm;
+                } else {
+                    self.sg_state = PopupBuilderState::SessionName;
+                }
             }
             PopupBuilderState::SessionGroupConfirm => {
-                self.temp_session_group = Some(self.session_group_builder.build());
+                if data != PopupStateAction::Next {
+                    self.temp_session_group = Some(self.session_group_builder.build());
+                }
+
                 self.session_group_builder = SessionGroup::builder();
                 self.session_builder = None;
+                self.sg_state = PopupBuilderState::Done;
             }
             _ => {}
         }
+
+        self.clear_textarea();
     }
 
     pub fn is_open(&self) -> bool {
@@ -166,7 +231,7 @@ impl<'a> PopupState<'a> {
         self.hide();
 
         self.session_group_builder = SessionGroup::builder();
-        self.sg_prompt_index = 0;
+        self.sg_state = PopupBuilderState::SessionGroupName;
     }
 }
 

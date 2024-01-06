@@ -9,7 +9,7 @@ use std::io::{self, stdout};
 use std::{fs, vec};
 use tui_textarea::{Input, Key};
 
-use super::view_state::ViewState;
+use super::view_state::{PopupStateAction, ViewState};
 use super::{config::Config, view_state::PopupBuilderState};
 
 const HELP_MENU_TEXT: &str = "\
@@ -105,10 +105,7 @@ fn handle_edit_mode_events(state: &mut ViewState) -> io::Result<bool> {
 
     // this is horrible, the state machine needs to be reworked or something :(
     match event::read()?.into() {
-        Input { key: Key::Esc, .. } => {
-            // Close popup
-            popup_state.reset_state();
-        }
+        Input { key: Key::Esc, .. } => popup_state.reset_state(), // Close popup
         Input {
             // Submit
             key: Key::Enter,
@@ -124,8 +121,7 @@ fn handle_edit_mode_events(state: &mut ViewState) -> io::Result<bool> {
                     return Ok(false);
                 }
 
-                popup_state.push_data(&line);
-                popup_state.increment_prompt();
+                popup_state.increment_state(PopupStateAction::StoreStr(&line));
 
                 if popup_state.get_state() == PopupBuilderState::Done {
                     state.add_temp_session_group_to_cfg();
@@ -135,9 +131,7 @@ fn handle_edit_mode_events(state: &mut ViewState) -> io::Result<bool> {
         input => match popup_state.get_state() {
             PopupBuilderState::SessionGroupConfirm | PopupBuilderState::Done => {
                 if input.key == Key::Char('y') {
-                    let tmp = String::new();
-
-                    popup_state.push_data(&tmp);
+                    popup_state.increment_state(PopupStateAction::Store);
                     state.add_temp_session_group_to_cfg();
                 }
 
@@ -146,19 +140,16 @@ fn handle_edit_mode_events(state: &mut ViewState) -> io::Result<bool> {
             }
             PopupBuilderState::SessionAddConfirm => {
                 if input.key == Key::Char('y') {
-                    let tmp = String::new();
-                    popup_state.push_data(&tmp);
-                    popup_state.increment_prompt();
+                    popup_state.increment_state(PopupStateAction::Store);
                 } else if input.key == Key::Char('n') {
-                    popup_state.increment_prompt();
+                    popup_state.increment_state(PopupStateAction::Next);
                 }
             }
             PopupBuilderState::SessionAddMore => {
                 if input.key == Key::Char('y') {
-                    let tmp = String::new();
-                    popup_state.push_data(&tmp);
+                    popup_state.increment_state(PopupStateAction::Store);
                 } else if input.key == Key::Char('n') {
-                    popup_state.increment_prompt();
+                    popup_state.increment_state(PopupStateAction::Next);
                 }
             }
             _ => {
@@ -262,10 +253,7 @@ fn popup_ui(state: &mut ViewState, frame: &mut Frame) {
         area,
     );
 
-    let (prompt, placeholder) = match state.popup_state.get_prompt() {
-        Some((prompt, placeholder)) => (prompt, placeholder),
-        None => panic!("Unimplemented!"),
-    };
+    let (prompt, placeholder) = state.popup_state.get_prompt();
 
     // conditional rendering
     // textbox or paragraph
