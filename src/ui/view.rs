@@ -399,7 +399,6 @@ fn connect_selected_ui(
     terminal.hide_cursor()?;
     execute!(terminal.backend_mut(), EnableMouseCapture)?;
     terminal.clear()?;
-    //terminal.draw(|frame| ui(state, frame))?; // redraw ui
 
     Ok(())
 }
