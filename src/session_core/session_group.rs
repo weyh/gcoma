@@ -33,12 +33,12 @@ impl SessionGroupBuilder {
 
     pub fn name(&mut self, name: String) -> &mut SessionGroupBuilder {
         self.name = name;
-        return self;
+        self
     }
 
     pub fn add_session(&mut self, session: SessionBuilder) -> &mut SessionGroupBuilder {
         self.sessions.push(session);
-        return self;
+        self
     }
 
     pub fn build(&self) -> SessionGroup {

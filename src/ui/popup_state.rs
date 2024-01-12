@@ -50,6 +50,7 @@ pub struct PopupState<'a> {
     pub temp_session_group: Option<SessionGroup>,
 }
 
+#[allow(clippy::let_and_return)]
 fn sg_prompts() -> &'static HashMap<PopupBuilderState, (&'static str, &'static str)> {
     static MAP: OnceLock<HashMap<PopupBuilderState, (&'static str, &'static str)>> =
         OnceLock::new();
@@ -123,7 +124,7 @@ impl<'a> PopupState<'a> {
 
     pub fn get_prompt(&self) -> (&'static str, &'static str) {
         let d = sg_prompts().get(&self.sg_state).unwrap();
-        return *d;
+        *d
     }
 
     /// returns true if the state was changed
@@ -200,7 +201,7 @@ impl<'a> PopupState<'a> {
     }
 
     pub fn is_open(&self) -> bool {
-        return self.open;
+        self.open
     }
 
     pub fn hide(&mut self) {

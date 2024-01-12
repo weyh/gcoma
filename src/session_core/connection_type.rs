@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub enum ConnectionType {
     Telnet,
