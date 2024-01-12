@@ -1,7 +1,7 @@
-use clap::{App, Arg};
+use clap::{Arg, ArgMatches, Command};
 
-pub fn get_args() -> clap::ArgMatches {
-    return App::new(env!("CARGO_CRATE_NAME"))
+pub fn get_args() -> ArgMatches {
+    Command::new(env!("CARGO_CRATE_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .arg(
             Arg::new("user_config")
@@ -15,7 +15,7 @@ pub fn get_args() -> clap::ArgMatches {
             Arg::new("list")
                 .short('l')
                 .long("list")
-                .conflicts_with_all(&["connect", "remove"])
+                .conflicts_with_all(["connect", "remove"])
                 .help("List all sessions"),
         )
         .arg(
@@ -23,7 +23,7 @@ pub fn get_args() -> clap::ArgMatches {
                 .short('c')
                 .long("connect")
                 .value_name("SESSION_INDEX")
-                .conflicts_with_all(&["list", "remove"])
+                .conflicts_with_all(["list", "remove"])
                 .help("Connect to session by index"),
         )
         .arg(
@@ -31,8 +31,8 @@ pub fn get_args() -> clap::ArgMatches {
                 .short('r')
                 .long("remove")
                 .value_name("SESSION_GROUP_NAME")
-                .conflicts_with_all(&["list", "connect"])
+                .conflicts_with_all(["list", "connect"])
                 .help("Remove session group by name"),
         )
-        .get_matches();
+        .get_matches()
 }
