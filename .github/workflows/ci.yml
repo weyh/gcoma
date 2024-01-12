@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Deploy'
+        required: false
+        default: true
+        type: boolean
+      version:
+        description: 'Version'
+        required: true
+        default: 'v2.0.0'
+        type: string
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    defaults:
+      run:
+        working-directory: /
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Setup rust
+      uses: ATiltedTree/setup-rust@v1
+      with:
+        rust-version: stable
+        components: clippy
+
+    - name: Build
+      run: cargo build --release
+
+    - name: Lint
+      run: cargo clippy
+
+    - name: Test
+      run: cargo test -r
+
+  deploy:
+    if: ${{ github.event.inputs.deploy == 'true' }}
+    needs: [build]
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup rust
+        uses: ATiltedTree/setup-rust@v1
+        with:
+          rust-version: stable
+
+      - name: Build (x86_64-unknown-linux-gnu)
+        run: cargo build --release --target=x86_64-unknown-linux-gnu
+
+      - name: Create pkg (x86_64-unknown-linux-gnu)
+        working-directory: target/x86_64-unknown-linux-gnu/release
+        run: |
+          cp ../../../README.md README.md &&
+          cp ../../../LICENSE LICENSE &&
+          tar -czvf gcoma_x86_64-unknown-linux-gnu.tar.gz README.md LICENSE gcoma
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/x86_64-unknown-linux-gnu/release/gcoma_x86_64-unknown-linux-gnu.tar.gz
+          tag_name: ${{ github.event.inputs.version }}
+          draft: true
+          prerelease: false
+
+
