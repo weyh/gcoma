@@ -24,10 +24,6 @@ jobs:
   build:
     runs-on: ubuntu-20.04
 
-    defaults:
-      run:
-        working-directory: /
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
