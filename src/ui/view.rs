@@ -25,9 +25,9 @@ Navigate:
 
 Actions:
   q/ESC: quit
-      a: add Session Group
+      a: add session group
       r: remove
-      R: Reload config";
+      R: reload config";
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
 fn create_centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
@@ -204,14 +204,12 @@ fn handle_events(cfg_path: &str, state: &mut ViewState) -> io::Result<bool> {
 }
 
 fn table_ui(state: &mut ViewState, frame: &mut Frame, area: &Rect) {
-    let selected_style = Style::default().add_modifier(Modifier::REVERSED);
-    let normal_style = Style::default().bg(Color::Blue);
     let header_cells = ["Group Name", "Session Name", "Username", "IP", "Port"]
         .iter()
-        .map(|h| Cell::from(*h).style(Style::default().fg(Color::Red)));
+        .map(|h| Cell::from(*h).style(Style::default().fg(Color::White)));
 
     let header = Row::new(header_cells)
-        .style(normal_style)
+        .style(Style::default().bg(Color::DarkGray))
         .height(1)
         .bottom_margin(1);
 
@@ -251,7 +249,7 @@ fn table_ui(state: &mut ViewState, frame: &mut Frame, area: &Rect) {
     )
     .header(header)
     .block(Block::default().borders(Borders::ALL).title("Sessions"))
-    .highlight_style(selected_style)
+    .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
     .highlight_symbol(">> ");
 
     frame.render_stateful_widget(t, *area, &mut state.table_state);
