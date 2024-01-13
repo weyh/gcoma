@@ -4,12 +4,12 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{prelude::*, widgets::*};
-use serde_json;
+
 use std::io::{self, stdout, Stdout};
-use std::{fs, vec};
+use std::vec;
 use tui_textarea::{Input, Key};
 
-use crate::session_core::session::Session;
+use crate::{load_cfg_from_file, session_core::session::Session};
 
 use super::view_state::ViewState;
 use super::{
@@ -48,12 +48,6 @@ fn create_centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
             Constraint::Percentage((100 - percent_x) / 2),
         ])
         .split(popup_layout[1])[1]
-}
-
-fn load_cfg_from_file(cfg_path: &str) -> io::Result<Config> {
-    let cfg_str = fs::read_to_string(cfg_path)?;
-    let config = serde_json::from_str(&cfg_str)?;
-    Ok(config)
 }
 
 fn remove_selected(state: &mut ViewState) {
@@ -401,8 +395,8 @@ fn connect_selected_ui(
     Ok(())
 }
 
-pub fn display(cfg_path: &str) -> io::Result<()> {
-    let mut state = ViewState::new(load_cfg_from_file(cfg_path).unwrap_or(Config::new()));
+pub fn display(cfg_path: &str, cfg: io::Result<Config>) -> io::Result<()> {
+    let mut state = ViewState::new(cfg.unwrap_or(Config::new()));
 
     enable_raw_mode()?;
     execute!(stdout(), EnterAlternateScreen, EnableMouseCapture)?;
