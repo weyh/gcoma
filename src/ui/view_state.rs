@@ -18,9 +18,10 @@ impl<'a> ViewState<'a> {
         }
     }
 
-    pub fn add_temp_session_group_to_cfg(&mut self) {
+    pub fn add_temp_session_group_to_cfg(&mut self, cfg_path: &str) {
         if let Some(sg) = self.popup_state.temp_session_group.take() {
             self.config.session_groups.push(sg);
+            self.config.save(cfg_path);
         }
     }
 

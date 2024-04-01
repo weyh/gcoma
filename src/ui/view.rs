@@ -109,7 +109,10 @@ fn handle_normal_mode_events(state: &mut ViewState, cfg_path: &str) -> io::Resul
                     return Ok(true);
                 }
                 KeyCode::Char('a') => state.popup_state.show(),
-                KeyCode::Char('r') => remove_selected(state),
+                KeyCode::Char('r') => {
+                    remove_selected(state);
+                    state.config.save(cfg_path);
+                }
                 KeyCode::Char('R') => {
                     state.config = load_cfg_from_file(cfg_path).unwrap_or(Config::new());
                 }
@@ -124,7 +127,7 @@ fn handle_normal_mode_events(state: &mut ViewState, cfg_path: &str) -> io::Resul
     Ok(false)
 }
 
-fn handle_edit_mode_events(state: &mut ViewState) -> io::Result<bool> {
+fn handle_edit_mode_events(state: &mut ViewState, cfg_path: &str) -> io::Result<bool> {
     let popup_state = &mut state.popup_state;
 
     // this is horrible, the state machine needs to be reworked or something :(
@@ -148,7 +151,7 @@ fn handle_edit_mode_events(state: &mut ViewState) -> io::Result<bool> {
                 popup_state.increment_state(PopupStateAction::StoreStr(&line));
 
                 if popup_state.get_state() == PopupBuilderState::Done {
-                    state.add_temp_session_group_to_cfg();
+                    state.add_temp_session_group_to_cfg(cfg_path);
                 }
             }
         },
@@ -156,7 +159,7 @@ fn handle_edit_mode_events(state: &mut ViewState) -> io::Result<bool> {
             PopupBuilderState::SessionGroupConfirm | PopupBuilderState::Done => {
                 if input.key == Key::Char('y') {
                     popup_state.increment_state(PopupStateAction::Store);
-                    state.add_temp_session_group_to_cfg();
+                    state.add_temp_session_group_to_cfg(cfg_path);
                 }
 
                 // Close popup
@@ -190,7 +193,7 @@ fn handle_events(cfg_path: &str, state: &mut ViewState) -> io::Result<bool> {
         if !state.popup_state.is_open() {
             return handle_normal_mode_events(state, cfg_path);
         } else {
-            return handle_edit_mode_events(state);
+            return handle_edit_mode_events(state, cfg_path);
         }
     }
 
