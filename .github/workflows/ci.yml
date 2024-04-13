@@ -28,9 +28,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     - name: Setup rust
-      uses: ATiltedTree/setup-rust@v1
+      uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
-        rust-version: stable
+        toolchain: stable
         components: clippy
 
     - name: Build
@@ -51,9 +51,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup rust
-        uses: ATiltedTree/setup-rust@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          rust-version: stable
+          toolchain: stable
 
       - name: Build (x86_64-unknown-linux-gnu)
         run: cargo build --release --target=x86_64-unknown-linux-gnu
