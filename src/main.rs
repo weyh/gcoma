@@ -27,12 +27,12 @@ fn main() -> io::Result<()> {
     let matches = args::get_args();
     let cfg_path = matches.get_one::<String>("user_config");
 
-    if cfg_path.is_some() {
-        let user_config = load_cfg_from_file(cfg_path.unwrap().as_str());
+    if let Some(path) = cfg_path {
+        let user_config = load_cfg_from_file(path.as_str());
 
         let list_flag = matches.get_one::<bool>("list").unwrap_or(&false).to_owned();
         let connect_idx = matches.get_one::<String>("connect");
-        let rm_sg = matches.get_one::<String>("remove");
+        let remove_sg = matches.get_one::<String>("remove");
 
         if list_flag {
             let mut i = 0;
@@ -45,8 +45,8 @@ fn main() -> io::Result<()> {
                     i += 1;
                 }
             }
-        } else if connect_idx.is_some() {
-            let mut idx: usize = connect_idx.unwrap().parse().unwrap();
+        } else if let Some(idx) = connect_idx {
+            let mut idx: usize = idx.parse().unwrap();
 
             for sg in user_config?.session_groups.iter() {
                 for s in sg.sessions.iter() {
@@ -57,9 +57,9 @@ fn main() -> io::Result<()> {
                     idx -= 1;
                 }
             }
-        } else if rm_sg.is_some() {
+        } else if let Some(rm_sg) = remove_sg {
             let mut ucfg = user_config.unwrap_or(Config::new());
-            let sg_name = rm_sg.unwrap().to_owned();
+            let sg_name = rm_sg.to_owned();
 
             ucfg.session_groups.retain(|sg| sg.name != sg_name);
 

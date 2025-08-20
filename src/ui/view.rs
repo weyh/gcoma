@@ -1,11 +1,11 @@
-use crossterm::{
+use ratatui::crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{prelude::*, widgets::*};
 
-use std::io::{self, stdout, Stdout};
+use std::io::{self, Stdout, stdout};
 use std::vec;
 use tui_textarea::{Input, Key};
 
@@ -76,10 +76,7 @@ fn remove_selected(state: &mut ViewState) {
 }
 
 fn find_selected(state: &mut ViewState) -> Option<Session> {
-    let mut selected_idx = match state.table_state.selected() {
-        Some(i) => i,
-        None => return None,
-    };
+    let mut selected_idx = state.table_state.selected()?;
 
     for session_group in state.config.session_groups.iter() {
         if selected_idx == 0 {
@@ -101,26 +98,26 @@ fn find_selected(state: &mut ViewState) -> Option<Session> {
 }
 
 fn handle_normal_mode_events(state: &mut ViewState, cfg_path: &str) -> io::Result<bool> {
-    if let Event::Key(key) = event::read()? {
-        if key.kind == event::KeyEventKind::Press {
-            match key.code {
-                KeyCode::Char('q') | KeyCode::Esc => {
-                    // Quit
-                    return Ok(true);
-                }
-                KeyCode::Char('a') => state.popup_state.show(),
-                KeyCode::Char('r') => {
-                    remove_selected(state);
-                    state.config.save(cfg_path);
-                }
-                KeyCode::Char('R') => {
-                    state.config = load_cfg_from_file(cfg_path).unwrap_or(Config::new());
-                }
-                KeyCode::Enter => state.connected = true,
-                KeyCode::Down | KeyCode::Char('j') => state.next(),
-                KeyCode::Up | KeyCode::Char('k') => state.previous(),
-                _ => {}
+    if let Event::Key(key) = event::read()?
+        && key.kind == event::KeyEventKind::Press
+    {
+        match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => {
+                // Quit
+                return Ok(true);
             }
+            KeyCode::Char('a') => state.popup_state.show(),
+            KeyCode::Char('r') => {
+                remove_selected(state);
+                state.config.save(cfg_path);
+            }
+            KeyCode::Char('R') => {
+                state.config = load_cfg_from_file(cfg_path).unwrap_or(Config::new());
+            }
+            KeyCode::Enter => state.connected = true,
+            KeyCode::Down | KeyCode::Char('j') => state.next(),
+            KeyCode::Up | KeyCode::Char('k') => state.previous(),
+            _ => {}
         }
     }
 
@@ -246,7 +243,7 @@ fn table_ui(state: &mut ViewState, frame: &mut Frame, area: &Rect) {
     )
     .header(header)
     .block(Block::default().borders(Borders::ALL).title("Sessions"))
-    .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
+    .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
     .highlight_symbol(">> ");
 
     frame.render_stateful_widget(t, *area, &mut state.table_state);
@@ -254,13 +251,16 @@ fn table_ui(state: &mut ViewState, frame: &mut Frame, area: &Rect) {
 
 fn popup_ui(state: &mut ViewState, frame: &mut Frame) {
     let create_block = |title, border, modifier, color| {
-        Block::default().borders(border).gray().title(Span::styled(
-            title,
-            Style::default().add_modifier(modifier).fg(color),
-        ))
+        block::Block::default()
+            .borders(border)
+            .gray()
+            .title(Span::styled(
+                title,
+                Style::default().add_modifier(modifier).fg(color),
+            ))
     };
 
-    let area = create_centered_rect(50, 50, frame.size());
+    let area = create_centered_rect(50, 50, frame.area());
     let chunks = Layout::new(
         Direction::Vertical,
         [Constraint::Percentage(100), Constraint::Percentage(100)],
@@ -297,8 +297,8 @@ fn popup_ui(state: &mut ViewState, frame: &mut Frame) {
             ));
             textarea.set_placeholder_text(placeholder);
             frame.render_widget(
-                textarea.widget(),
-                chunks[0].inner(&Margin {
+                &*textarea,
+                chunks[0].inner(Margin {
                     vertical: 1,
                     horizontal: 2,
                 }),
@@ -312,7 +312,7 @@ fn popup_ui(state: &mut ViewState, frame: &mut Frame) {
             let paragraph = Paragraph::new(line).bold();
             frame.render_widget(
                 paragraph,
-                chunks[0].inner(&Margin {
+                chunks[0].inner(Margin {
                     vertical: 1,
                     horizontal: 2,
                 }),
@@ -326,7 +326,7 @@ fn ui(state: &mut ViewState, frame: &mut Frame) {
         Direction::Vertical,
         [Constraint::Length(1), Constraint::Min(0)],
     )
-    .split(frame.size());
+    .split(frame.area());
 
     // Title
     frame.render_widget(
@@ -380,10 +380,10 @@ fn connect_selected_ui(
     terminal.draw(|frame| {
         frame.render_widget(
             Block::default().title(text).borders(Borders::TOP),
-            frame.size(),
+            frame.area(),
         )
     })?;
-    terminal.set_cursor(0, 1)?;
+    terminal.set_cursor_position(Position { x: 0, y: 1 })?;
     terminal.show_cursor()?;
 
     disable_raw_mode()?;

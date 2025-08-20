@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
+use std::fmt;
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -8,12 +9,13 @@ pub enum ConnectionType {
     SSH,
 }
 
-impl ToString for ConnectionType {
-    fn to_string(&self) -> String {
-        match self {
-            ConnectionType::Telnet => "telnet".to_string(),
-            ConnectionType::SSH => "ssh".to_string(),
-        }
+impl fmt::Display for ConnectionType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            ConnectionType::Telnet => "telnet",
+            ConnectionType::SSH => "ssh",
+        };
+        write!(f, "{}", s)
     }
 }
 
