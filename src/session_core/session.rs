@@ -54,7 +54,7 @@ impl Session {
         self.data[start + 1..end].to_string()
     }
 
-    pub fn connect(&self) {
+    pub fn connect(&self) -> std::io::Result<std::process::ExitStatus> {
         let prog = self.connection_type.to_string();
         let mut args: Vec<String> = vec![self.get_ip()];
 
@@ -74,8 +74,8 @@ impl Session {
             }
         }
 
-        let mut child = Command::new(prog).args(&args).spawn().unwrap();
-        let _ = child.wait().unwrap();
+        let mut child = Command::new(prog).args(&args).spawn()?;
+        child.wait()
     }
 }
 

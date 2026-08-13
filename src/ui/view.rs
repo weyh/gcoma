@@ -382,27 +382,64 @@ fn connect_selected_ui(
         }
     };
 
-    let text = format!("Connecting to {}", session.data);
-    execute!(terminal.backend_mut(), DisableMouseCapture)?;
-    terminal.draw(|frame| {
-        frame.render_widget(
-            Block::default()
-                .title(Line::from(text))
-                .borders(Borders::TOP),
-            frame.area(),
-        )
-    })?;
-    terminal.set_cursor_position(Position { x: 0, y: 1 })?;
+    // Leave Ratatui context
     terminal.show_cursor()?;
-
     disable_raw_mode()?;
-    session.connect();
-    state.connected = false;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+
+    // 0 out terminal
+    {
+        use crossterm::{
+            cursor::MoveTo,
+            execute as ct_execute,
+            terminal::{Clear, ClearType},
+        };
+
+        ct_execute!(stdout(), Clear(ClearType::All))?;
+        ct_execute!(stdout(), MoveTo(0, 0))?;
+    }
+
+    // Run the session
+    println!("Connecting to {}", session.data);
+    let status = session.connect();
+
+    // Show a last state before re-entering to TUI
+    println!();
+    match status {
+        Ok(s) if s.success() => {
+            eprintln!(
+                "Session closed (exit status: {}). Press any key to return…",
+                s
+            );
+        }
+        Ok(s) => {
+            eprintln!(
+                "Session closed with error (exit status: {}). Press any key to return…",
+                s
+            );
+        }
+        Err(e) => {
+            eprintln!("Failed to run session: {e}. Press any key to return…");
+        }
+    }
+
+    // Wait for one key press from the user before repainting
+    {
+        use std::io::Read;
+        let _ = std::io::stdin().read(&mut [0u8; 1]);
+    }
+
+    // Re-enter Ratatui
     enable_raw_mode()?;
+    execute!(stdout(), EnterAlternateScreen, EnableMouseCapture)?;
+    *terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
 
     terminal.hide_cursor()?;
-    execute!(terminal.backend_mut(), EnableMouseCapture)?;
-    terminal.clear()?;
+    state.connected = false;
 
     Ok(())
 }
@@ -419,16 +456,9 @@ pub fn display(cfg_path: &str, cfg: io::Result<Config>) -> io::Result<()> {
         .textarea
         .set_cursor_line_style(Style::default());
 
-    let mut should_quit = false;
-    while !should_quit {
-        if !state.connected {
-            terminal.draw(|frame| ui(&mut state, frame))?;
-            should_quit = handle_events(cfg_path, &mut state)?;
-        } else {
-            connect_selected_ui(&mut state, &mut terminal)?;
-        }
-    }
+    let result = run_app(&mut terminal, &mut state, cfg_path);
 
+    // Always restore the terminal before returning
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
@@ -438,5 +468,22 @@ pub fn display(cfg_path: &str, cfg: io::Result<Config>) -> io::Result<()> {
     terminal.show_cursor()?;
 
     state.config.save(cfg_path);
+    result
+}
+
+fn run_app(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    state: &mut ViewState,
+    cfg_path: &str,
+) -> io::Result<()> {
+    let mut should_quit = false;
+    while !should_quit {
+        if !state.connected {
+            terminal.draw(|frame| ui(state, frame))?;
+            should_quit = handle_events(cfg_path, state)?;
+        } else {
+            connect_selected_ui(state, terminal)?;
+        }
+    }
     Ok(())
 }

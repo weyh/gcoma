@@ -51,8 +51,8 @@ fn main() -> io::Result<()> {
             for sg in user_config?.session_groups.iter() {
                 for s in sg.sessions.iter() {
                     if idx == 0 {
-                        s.connect();
-                        break;
+                        let _ = s.connect();
+                        return Ok(());
                     }
                     idx -= 1;
                 }
