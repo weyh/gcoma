@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use std::fmt;
 
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 pub enum ConnectionType {
     Telnet,
     SSH,

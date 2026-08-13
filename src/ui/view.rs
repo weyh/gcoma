@@ -5,9 +5,9 @@ use ratatui::crossterm::{
 };
 use ratatui::{prelude::*, widgets::*};
 
+use ratatui_textarea::{Input, Key};
 use std::io::{self, Stdout, stdout};
 use std::vec;
-use tui_textarea::{Input, Key};
 
 use crate::{load_cfg_from_file, session_core::session::Session};
 
@@ -242,22 +242,26 @@ fn table_ui(state: &mut ViewState, frame: &mut Frame, area: &Rect) {
         ],
     )
     .header(header)
-    .block(Block::default().borders(Borders::ALL).title("Sessions"))
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(Line::from("Sessions")),
+    )
     .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
-    .highlight_symbol(">> ");
+    .highlight_symbol(Line::from(">> "));
 
     frame.render_stateful_widget(t, *area, &mut state.table_state);
 }
 
 fn popup_ui(state: &mut ViewState, frame: &mut Frame) {
     let create_block = |title, border, modifier, color| {
-        block::Block::default()
+        Block::default()
             .borders(border)
             .gray()
-            .title(Span::styled(
+            .title(Line::from(Span::styled(
                 title,
                 Style::default().add_modifier(modifier).fg(color),
-            ))
+            )))
     };
 
     let area = create_centered_rect(50, 50, frame.area());
@@ -332,8 +336,7 @@ fn ui(state: &mut ViewState, frame: &mut Frame) {
     frame.render_widget(
         Block::new()
             .borders(Borders::TOP)
-            .title(env!("CARGO_CRATE_NAME"))
-            .title_alignment(Alignment::Center)
+            .title(Line::from(env!("CARGO_CRATE_NAME")).centered())
             .bold()
             .green(),
         root_layout[0],
@@ -349,8 +352,12 @@ fn ui(state: &mut ViewState, frame: &mut Frame) {
     .split(root_layout[1]);
 
     // Menu
-    let paragraph = Paragraph::new(HELP_MENU_TEXT)
-        .block(Block::default().title("Help").dim().borders(Borders::ALL));
+    let paragraph = Paragraph::new(HELP_MENU_TEXT).block(
+        Block::default()
+            .title(Line::from("Help"))
+            .dim()
+            .borders(Borders::ALL),
+    );
 
     frame.render_widget(paragraph, inner_layout[1]);
 
@@ -379,7 +386,9 @@ fn connect_selected_ui(
     execute!(terminal.backend_mut(), DisableMouseCapture)?;
     terminal.draw(|frame| {
         frame.render_widget(
-            Block::default().title(text).borders(Borders::TOP),
+            Block::default()
+                .title(Line::from(text))
+                .borders(Borders::TOP),
             frame.area(),
         )
     })?;

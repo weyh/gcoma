@@ -45,7 +45,7 @@ pub struct PopupState<'a> {
     session_builder: Option<SessionBuilder>,
     sg_state: PopupBuilderState,
 
-    pub textarea: tui_textarea::TextArea<'a>,
+    pub textarea: ratatui_textarea::TextArea<'a>,
 
     pub temp_session_group: Option<SessionGroup>,
 }
@@ -112,7 +112,7 @@ impl<'a> PopupState<'a> {
             session_builder: None,
 
             sg_state: PopupBuilderState::SessionGroupName,
-            textarea: tui_textarea::TextArea::default(),
+            textarea: ratatui_textarea::TextArea::default(),
 
             temp_session_group: None,
         }
@@ -214,7 +214,7 @@ impl<'a> PopupState<'a> {
 
     pub fn clear_textarea(&mut self) {
         // is there no clear method?
-        self.textarea.move_cursor(tui_textarea::CursorMove::End);
+        self.textarea.move_cursor(ratatui_textarea::CursorMove::End);
         while self.textarea.delete_char() {}
     }
 
