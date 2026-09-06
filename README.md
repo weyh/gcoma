@@ -4,6 +4,8 @@
 
 The goal of this project is to create a MTPuTTY like cli app, where you can easily store/group all your telnet and ssh sessions.
 
+Sessions may also use the `Command` connection type. Its `data` field contains an executable followed by its arguments, such as `scp -P 2222 local-file user@example.com:/tmp`. gcoma launches that executable directly, without wrapping it in a shell or expanding shell syntax. Quoted arguments are supported. Existing `SSH` and `Telnet` configuration entries remain unchanged.
+
 If you find anything that isn't rusty enough feel free to correct me. 🙂
 
 ## Args

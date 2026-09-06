@@ -198,7 +198,7 @@ fn handle_events(cfg_path: &str, state: &mut ViewState) -> io::Result<bool> {
 }
 
 fn table_ui(state: &mut ViewState, frame: &mut Frame, area: &Rect) {
-    let header_cells = ["Group Name", "Session Name", "Username", "IP", "Port"]
+    let header_cells = ["Group Name", "Session Name", "Command"]
         .iter()
         .map(|h| Cell::from(*h).style(Style::default().fg(Color::White)));
 
@@ -214,18 +214,17 @@ fn table_ui(state: &mut ViewState, frame: &mut Frame, area: &Rect) {
             Cell::from(session_group.name.clone()),
             Cell::from(" "),
             Cell::from(" "),
-            Cell::from(" "),
-            Cell::from(" "),
         ];
         rows.push(Row::new(sg_cells));
 
         for session in session_group.sessions.iter() {
+            let command = session
+                .command_display()
+                .unwrap_or_else(|error| format!("<invalid command: {error}>"));
             let s_cells = vec![
                 Cell::from(" "),
                 Cell::from(session.name.clone()),
-                Cell::from(session.get_user_name()),
-                Cell::from(session.get_ip()),
-                Cell::from(session.get_port()),
+                Cell::from(command),
             ];
             rows.push(Row::new(s_cells));
         }
@@ -236,9 +235,7 @@ fn table_ui(state: &mut ViewState, frame: &mut Frame, area: &Rect) {
         [
             Constraint::Percentage(20),
             Constraint::Percentage(20),
-            Constraint::Percentage(20),
-            Constraint::Percentage(30),
-            Constraint::Percentage(10),
+            Constraint::Percentage(60),
         ],
     )
     .header(header)
@@ -404,7 +401,9 @@ fn connect_selected_ui(
     }
 
     // Run the session
-    println!("Connecting to {}", session.data);
+    if let Ok(command) = session.command_display() {
+        println!("Executing {command}");
+    }
     let status = session.connect();
 
     // Show a last state before re-entering to TUI

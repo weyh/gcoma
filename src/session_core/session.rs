@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use std::{io, process::Command};
 
 use super::connection_type::ConnectionType;
 
@@ -24,12 +24,20 @@ impl Session {
     }
 
     pub fn get_user_name(&self) -> String {
+        if self.connection_type == ConnectionType::Command {
+            return String::new();
+        }
+
         let end = self.data.find('@').unwrap_or(0);
 
         self.data[..end].to_string()
     }
 
     pub fn get_ip(&self) -> String {
+        if self.connection_type == ConnectionType::Command {
+            return self.data.clone();
+        }
+
         let mut start = self.data.find('@').unwrap_or(0);
         let end = self.data.find(':').unwrap_or(self.data.len());
 
@@ -41,6 +49,10 @@ impl Session {
     }
 
     pub fn get_port(&self) -> String {
+        if self.connection_type == ConnectionType::Command {
+            return String::new();
+        }
+
         let start = self.data.find(':').unwrap_or(0);
 
         if start == 0 && self.connection_type == ConnectionType::SSH {
@@ -54,29 +66,63 @@ impl Session {
         self.data[start + 1..end].to_string()
     }
 
-    pub fn connect(&self) -> std::io::Result<std::process::ExitStatus> {
-        let prog = self.connection_type.to_string();
-        let mut args: Vec<String> = vec![self.get_ip()];
-
-        match self.connection_type {
+    /// Builds the exact process invocation represented by this session.
+    pub fn build_command(&self) -> io::Result<Command> {
+        let command = match self.connection_type {
             ConnectionType::SSH => {
-                args.push("-p".to_string());
-                args.push(self.get_port());
+                let mut command = Command::new("ssh");
+                command.arg(self.get_ip()).arg("-p").arg(self.get_port());
 
-                let usr_name = self.get_user_name();
-                if !usr_name.is_empty() {
-                    args.push("-l".to_string());
-                    args.push(usr_name);
+                let user_name = self.get_user_name();
+                if !user_name.is_empty() {
+                    command.arg("-l").arg(user_name);
                 }
+
+                command
             }
             ConnectionType::Telnet => {
-                args.push(self.get_port());
+                let mut command = Command::new("telnet");
+                command.arg(self.get_ip()).arg(self.get_port());
+                command
             }
-        }
+            ConnectionType::Command => command_from_data(&self.data)?,
+        };
 
-        let mut child = Command::new(prog).args(&args).spawn()?;
+        Ok(command)
+    }
+
+    /// Returns a copyable representation of the process invocation.
+    pub fn command_display(&self) -> io::Result<String> {
+        let command = self.build_command()?;
+        let words = std::iter::once(command.get_program().to_string_lossy().into_owned()).chain(
+            command
+                .get_args()
+                .map(|argument| argument.to_string_lossy().into_owned()),
+        );
+
+        Ok(shell_words::join(words))
+    }
+
+    pub fn connect(&self) -> std::io::Result<std::process::ExitStatus> {
+        let mut command = self.build_command()?;
+        let mut child = command.spawn()?;
         child.wait()
     }
+}
+
+fn command_from_data(data: &str) -> io::Result<Command> {
+    let arguments = shell_words::split(data)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
+    let (program, arguments) = arguments.split_first().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "command session data cannot be empty",
+        )
+    })?;
+
+    let mut command = Command::new(program);
+    command.args(arguments);
+    Ok(command)
 }
 
 pub struct SessionBuilder {
@@ -109,11 +155,11 @@ impl SessionBuilder {
         self
     }
 
+    pub fn get_connection_type(&self) -> &ConnectionType {
+        &self.connection_type
+    }
+
     pub fn build(&self) -> Session {
-        Session::new(
-            self.name.clone(),
-            self.data.clone(),
-            self.connection_type.clone(),
-        )
+        Session::new(self.name.clone(), self.data.clone(), self.connection_type)
     }
 }

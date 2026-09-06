@@ -3,10 +3,12 @@ use std::convert::TryFrom;
 use std::fmt;
 
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub enum ConnectionType {
     Telnet,
     SSH,
+    #[serde(alias = "command")]
+    Command,
 }
 
 impl fmt::Display for ConnectionType {
@@ -14,6 +16,7 @@ impl fmt::Display for ConnectionType {
         let s = match self {
             ConnectionType::Telnet => "telnet",
             ConnectionType::SSH => "ssh",
+            ConnectionType::Command => "command",
         };
         write!(f, "{}", s)
     }
@@ -26,6 +29,7 @@ impl TryFrom<i32> for ConnectionType {
         match value {
             0 => Ok(ConnectionType::Telnet),
             1 => Ok(ConnectionType::SSH),
+            2 => Ok(ConnectionType::Command),
             _ => Err(()),
         }
     }

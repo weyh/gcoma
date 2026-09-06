@@ -50,52 +50,63 @@ pub struct PopupState<'a> {
     pub temp_session_group: Option<SessionGroup>,
 }
 
+type PromptKey = (PopupBuilderState, Option<ConnectionType>);
+
 #[allow(clippy::let_and_return)]
-fn sg_prompts() -> &'static HashMap<PopupBuilderState, (&'static str, &'static str)> {
-    static MAP: OnceLock<HashMap<PopupBuilderState, (&'static str, &'static str)>> =
-        OnceLock::new();
+fn sg_prompts() -> &'static HashMap<PromptKey, (&'static str, &'static str)> {
+    static MAP: OnceLock<HashMap<PromptKey, (&'static str, &'static str)>> = OnceLock::new();
 
     MAP.get_or_init(|| {
         let m = HashMap::from([
             (
-                PopupBuilderState::SessionGroupName,
+                (PopupBuilderState::SessionGroupName, None),
                 (
                     "Session Group Name:",
                     "Enter an easy to understand name for the session group...",
                 ),
             ),
             (
-                PopupBuilderState::SessionName,
+                (PopupBuilderState::SessionName, None),
                 (
                     "Session Name:",
                     "Enter an easy to understand name for the session...",
                 ),
             ),
             (
-                PopupBuilderState::SessionConnectionType,
+                (PopupBuilderState::SessionConnectionType, None),
                 (
-                    "Session Type (TELNET/SSH):",
-                    "Enter either 'telnet' or 'ssh'",
+                    "Session Type (TELNET/SSH/COMMAND):",
+                    "Enter 'telnet', 'ssh', or 'command'",
                 ),
             ),
             (
-                PopupBuilderState::SessionData,
+                (PopupBuilderState::SessionData, None),
                 ("Connection data:", "username@ip:port"),
             ),
             (
-                PopupBuilderState::SessionAddConfirm,
+                (
+                    PopupBuilderState::SessionData,
+                    Some(ConnectionType::Command),
+                ),
+                (
+                    "Command:",
+                    "executable followed by arguments, for example: scp -P 2222 file host:/tmp",
+                ),
+            ),
+            (
+                (PopupBuilderState::SessionAddConfirm, None),
                 ("Add session? (y/n)", ""),
             ),
             (
-                PopupBuilderState::SessionAddMore,
+                (PopupBuilderState::SessionAddMore, None),
                 ("Add another session? (y/n)", ""),
             ),
             (
-                PopupBuilderState::SessionGroupConfirm,
+                (PopupBuilderState::SessionGroupConfirm, None),
                 ("Add session group? (y/n)", ""),
             ),
             (
-                PopupBuilderState::Done,
+                (PopupBuilderState::Done, None),
                 ("Session group has been created", ""),
             ),
         ]);
@@ -123,8 +134,16 @@ impl<'a> PopupState<'a> {
     }
 
     pub fn get_prompt(&self) -> (&'static str, &'static str) {
-        let d = sg_prompts().get(&self.sg_state).unwrap();
-        *d
+        let connection_type = self
+            .session_builder
+            .as_ref()
+            .map(|builder| *builder.get_connection_type());
+        let prompt = sg_prompts()
+            .get(&(self.sg_state, connection_type))
+            .or_else(|| sg_prompts().get(&(self.sg_state, None)))
+            .unwrap();
+
+        *prompt
     }
 
     /// returns true if the state was changed
@@ -149,10 +168,12 @@ impl<'a> PopupState<'a> {
             }
             PopupBuilderState::SessionConnectionType => {
                 if data != PopupStateAction::Next {
-                    let t = if data.get_data().to_lowercase() == "telnet" {
-                        ConnectionType::Telnet
-                    } else {
-                        ConnectionType::SSH
+                    let t = match data.get_data().to_lowercase().as_str() {
+                        "t" => ConnectionType::Telnet,
+                        "telnet" => ConnectionType::Telnet,
+                        "c" => ConnectionType::Command,
+                        "command" => ConnectionType::Command,
+                        _ => ConnectionType::SSH,
                     };
 
                     self.session_builder.as_mut().unwrap().connection_type(t);
@@ -224,5 +245,30 @@ impl<'a> PopupState<'a> {
 
         self.session_group_builder = SessionGroup::builder();
         self.sg_state = PopupBuilderState::SessionGroupName;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PopupState, PopupStateAction};
+
+    #[test]
+    fn command_session_uses_the_command_data_prompt() {
+        let mut popup = PopupState::new();
+        let group_name = "Test Group".to_string();
+        let session_name = "Test Session".to_string();
+        let connection_type = "command".to_string();
+
+        popup.increment_state(PopupStateAction::StoreStr(&group_name));
+        popup.increment_state(PopupStateAction::StoreStr(&session_name));
+        popup.increment_state(PopupStateAction::StoreStr(&connection_type));
+
+        assert_eq!(
+            popup.get_prompt(),
+            (
+                "Command:",
+                "executable followed by arguments, for example: scp -P 2222 file host:/tmp"
+            )
+        );
     }
 }

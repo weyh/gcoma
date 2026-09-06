@@ -6,7 +6,6 @@ use ui::config::Config;
 mod tests;
 
 mod args;
-mod reqs_check;
 mod session_core;
 mod ui;
 
@@ -17,13 +16,6 @@ fn load_cfg_from_file(cfg_path: &str) -> io::Result<Config> {
 }
 
 fn main() -> io::Result<()> {
-    if !reqs_check::is_in_env("ssh") {
-        panic!("'ssh' is not found in PATH!");
-    }
-    if !reqs_check::is_in_env("telnet") {
-        panic!("'telnet' is not found in PATH!");
-    }
-
     let matches = args::get_args();
     let cfg_path = matches.get_one::<String>("user_config");
 

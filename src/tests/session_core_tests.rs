@@ -1,5 +1,6 @@
 use crate::session_core::connection_type::ConnectionType;
 use crate::session_core::session::Session;
+use std::ffi::OsStr;
 
 macro_rules! SESSION_NAME {
     () => {
@@ -114,4 +115,50 @@ fn user_name_test2() {
     );
 
     assert_eq!(session.get_user_name(), "");
+}
+
+#[test]
+fn command_session_launches_the_executable_with_its_arguments() {
+    let session = Session::new(
+        SESSION_NAME!(),
+        "scp -P 2222 'source file' user@example.com:/tmp".to_string(),
+        ConnectionType::Command,
+    );
+    let command = session.build_command().unwrap();
+
+    assert_eq!(command.get_program(), OsStr::new("scp"));
+    assert_eq!(
+        command.get_args().collect::<Vec<_>>(),
+        vec![
+            OsStr::new("-P"),
+            OsStr::new("2222"),
+            OsStr::new("source file"),
+            OsStr::new("user@example.com:/tmp"),
+        ]
+    );
+    assert_eq!(
+        session.command_display().unwrap(),
+        "scp -P 2222 'source file' user@example.com:/tmp"
+    );
+}
+
+#[test]
+fn command_session_requires_an_executable() {
+    let session = Session::new(SESSION_NAME!(), "  ".to_string(), ConnectionType::Command);
+    let error = session.build_command().unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+}
+
+#[test]
+fn ssh_session_display_matches_the_command_that_will_run() {
+    let session = Session::new(
+        SESSION_NAME!(),
+        "user@192.168.0.1:2222".to_string(),
+        ConnectionType::SSH,
+    );
+
+    assert_eq!(
+        session.command_display().unwrap(),
+        "ssh 192.168.0.1 -p 2222 -l user"
+    );
 }
